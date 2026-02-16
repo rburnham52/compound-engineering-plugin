@@ -63,9 +63,9 @@ Each cycle compounds: brainstorms sharpen plans, plans inform future plans, revi
 /add-plugin compound-engineering
 ```
 
-### OpenCode, Codex, Droid, Pi, Gemini, Copilot, Kiro, Windsurf, OpenClaw & Qwen (experimental)
+### OpenCode, Codex, Droid, Pi, Gemini, Copilot, Kiro, Windsurf, OpenClaw & Qwen (experimental) Install
 
-This repo includes a Bun/TypeScript CLI that converts Claude Code plugins to OpenCode, Codex, Factory Droid, Pi, Gemini CLI, GitHub Copilot, Kiro CLI, Windsurf, OpenClaw, and Qwen Code.
+This repo includes a Bun/TypeScript CLI that converts Claude Code plugins to OpenCode, Codex, Factory Droid, Pi, Gemini CLI, GitHub Copilot, Kiro CLI, Windsurf, OpenClaw, Qwen Code, and Devin.
 
 ```bash
 # convert the compound-engineering plugin into OpenCode format
@@ -101,6 +101,9 @@ bunx @every-env/compound-plugin install compound-engineering --to windsurf --sco
 # convert to Qwen Code format
 bunx @every-env/compound-plugin install compound-engineering --to qwen
 
+# convert to Devin format
+bunx @every-env/compound-plugin install compound-engineering --to devin
+
 # auto-detect installed tools and install to all
 bunx @every-env/compound-plugin install compound-engineering --to all
 ```
@@ -120,6 +123,7 @@ bunx @every-env/compound-plugin install compound-engineering --to all
 | `openclaw` | `~/.openclaw/extensions/<plugin>/` | Entry-point TypeScript skill file; `openclaw-extension.json` for MCP servers |
 | `windsurf` | `~/.codeium/windsurf/` (global) or `.windsurf/` (workspace) | Agents become skills; commands become flat workflows; `mcp_config.json` merged |
 | `qwen` | `~/.qwen/extensions/<plugin>/` | Agents as `.yaml`; env vars with placeholders extracted as settings; colon separator for nested commands |
+| `devin` | `.devin/` | Agents and commands become playbooks (`.devin.md`); skills become knowledge entry JSON files; MCP servers generate a setup instructions file |
 
 All provider targets are experimental and may change as the formats evolve.
 
@@ -259,6 +263,9 @@ bunx @every-env/compound-plugin sync --target qwen
 # Sync to OpenClaw (skills only; MCP is validation-gated)
 bunx @every-env/compound-plugin sync --target openclaw
 
+# Sync playbooks and knowledge to Devin (requires Enterprise plan + service user key)
+DEVIN_API_KEY=cog_xxx DEVIN_ORG_ID=org_xxx bunx @every-env/compound-plugin sync --target devin
+
 # Sync to all detected tools
 bunx @every-env/compound-plugin sync --target all
 ```
@@ -281,6 +288,7 @@ Supported sync targets:
 - `kiro`
 - `qwen`
 - `openclaw`
+- `devin`
 
 Notes:
 - Codex sync preserves non-managed `config.toml` content and now includes remote MCP servers.
@@ -289,4 +297,4 @@ Notes:
 - Gemini sync writes MCP config to `~/.gemini/` and avoids mirroring skills that Gemini already discovers from `~/.agents/skills`, which prevents duplicate-skill warnings.
 - Droid, Windsurf, Kiro, and Qwen sync merge MCP servers into the provider's documented user config.
 - OpenClaw currently syncs skills only. Personal command sync is skipped because this repo does not yet have a documented user-level OpenClaw command surface, and MCP sync is skipped because the current official OpenClaw docs do not clearly document an MCP server config contract.
-
+- Devin, API-based push to Devin playbooks and knowledge. Requires a service user key (`cog_` prefix) and `DEVIN_ORG_ID`. Enterprise plan required for knowledge sync. See [docs/guides/devin.md](docs/guides/devin.md).
