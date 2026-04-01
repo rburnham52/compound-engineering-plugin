@@ -187,6 +187,28 @@ describe("convertClaudeToDevin", () => {
     expect(bundle.knowledgeEntries[0].title).toBe("[CE] knowledge:dhh-rails-style")
   })
 
+  test("knowledge entries have !ce-name macro", () => {
+    const bundle = convertClaudeToDevin(fixturePlugin, defaultOptions)
+
+    const entry = bundle.knowledgeEntries[0]
+    expect(entry.macro).toBe("!ce-dhh-rails-style")
+    expect(entry.macro).not.toContain("_")
+  })
+
+  test("knowledge macro uses hyphens not underscores for hyphenated names", () => {
+    const plugin: ClaudePlugin = {
+      ...fixturePlugin,
+      agents: [],
+      commands: [],
+      skills: [{ name: "git-worktree", description: "Manage worktrees", sourceDir: "/tmp/s", skillPath: "/tmp/s/SKILL.md" }],
+    }
+
+    const bundle = convertClaudeToDevin(plugin, defaultOptions)
+
+    expect(bundle.knowledgeEntries[0].macro).toBe("!ce-git-worktree")
+    expect(bundle.knowledgeEntries[0].macro).not.toContain("_")
+  })
+
   // --- Macro generation tests ---
 
   test("command playbooks have macro field with hyphens", () => {

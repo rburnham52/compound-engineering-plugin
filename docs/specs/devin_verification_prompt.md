@@ -28,7 +28,7 @@ Scan the entire document for violations of each rule. Every rule must be checked
 
 **Rule 3 — Slash commands (workflow/command type)**
 - FAIL pattern: `/ce:<name>`, `/workflows:<name>`, or any bare `/ce_*` slash syntax
-- PASS pattern: `` Run `!ce_<name>` `` (inline macro invocation) — or with args: `` Run `!ce_<name>` with: <args> ``
+- PASS pattern: `` Run `!ce-<name>` `` (inline macro invocation) — or with args: `` Run `!ce-<name>` with: <args> ``
 - Agent-type targets (no macro): `Use propose_sessions to start a child session with the [CE] agent:<name> playbook`
 - Search regex: `/ce:|/workflows:|/commands:`
 
@@ -57,7 +57,7 @@ Scan the entire document for violations of each rule. Every rule must be checked
 **Rule 8 — Cross-playbook references**
 - FAIL pattern: `Task <agent>(args)` as inline cross-reference
 - FAIL pattern: `the ce-plan playbook`, `the ce-work playbook` — unresolved namespaced alias
-- PASS pattern for workflow/command: `` Run `!ce_<name>` `` or `` Run `!ce_<name>` with: <args> ``
+- PASS pattern for workflow/command: `` Run `!ce-<name>` `` or `` Run `!ce-<name>` with: <args> ``
 - PASS pattern for agents: `Use propose_sessions to start a child session with the [CE] agent:<name> playbook`
 - Search regex: `^-?\s*Task\s+|the ce-[a-z]+ playbook`
 
@@ -78,12 +78,12 @@ Verify the title follows the `[CE] type:name` convention:
 | Type | Title format | Macro format |
 |------|-------------|--------------|
 | Agent | `[CE] agent:<name>` | _(none)_ |
-| Command | `[CE] command:<name>` | `!ce_<name>` |
-| Workflow | `[CE] workflow:<name>` | `!ce_<name>` |
-| Knowledge | `[CE] knowledge:<name>` | _(none)_ |
+| Command | `[CE] command:<name>` | `!<name>` (hyphens only) |
+| Workflow | `[CE] workflow:<name>` | `!ce-<name>` |
+| Knowledge | `[CE] knowledge:<name>` | `!ce-<name>` |
 
 - Verify the title prefix matches the entry type
-- For workflows and commands, verify a macro is set (this is metadata, not in the body)
+- For workflows, commands, and knowledge entries, verify a macro is set (this is metadata, not in the body)
 
 ### Step 3: Check for Devin-incompatible patterns
 
@@ -94,8 +94,8 @@ These are issues the converter should catch but may miss:
 | `open <filepath>` or `xdg-open <filepath>` | Desktop command — Devin has no desktop | Remove or replace with "Present the file to the user" |
 | `review <filepath>` as a command | Not a Devin command | Replace with "Present the file contents to the user for review" |
 | `Load <name> skill` | Devin skills are repo-level, not loadable by name from playbooks | Replace with `the [CE] knowledge:<name> knowledge entry` if it's a knowledge entry |
-| `Run the X playbook with: args` (workflow/command) without macro | Should use inline macro invocation | Replace with `` Run `!ce_<name>` with: args `` for workflow/command playbooks; use `propose_sessions` only for agent-type playbooks |
-| `the ce-plan playbook` or `the ce-work playbook` (unresolved namespaced ref) | Converter failed to resolve refMap alias | Should be `` Run `!ce_plan` `` etc. — indicates a converter bug |
+| `Run the X playbook with: args` (workflow/command) without macro | Should use inline macro invocation | Replace with `` Run `!ce-<name>` with: args `` for workflow/command playbooks; use `propose_sessions` only for agent-type playbooks |
+| `the ce-plan playbook` or `the ce-work playbook` (unresolved namespaced ref) | Converter failed to resolve refMap alias | Should be `` Run `!ce-plan` `` etc. — indicates a converter bug |
 | `.claude/` directory paths | Claude Code convention | Replace with `.devin/` if referring to converter output, or remove if referring to runtime config |
 | Option numbering gaps (e.g., 1,2,3,5,7) | Artifact of removing Claude Code options | Renumber sequentially |
 | Circular fallbacks (e.g., "If AGENTS.md absent, fall back to AGENTS.md") | Logic error from bad find/replace | Fix the fallback target |

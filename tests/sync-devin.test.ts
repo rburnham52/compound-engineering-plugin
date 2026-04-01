@@ -230,4 +230,34 @@ describe("computeSyncPlan", () => {
     expect(plan.deletes).toHaveLength(0)
     expect(plan.unchanged).toHaveLength(0)
   })
+
+  test("knowledge macro change triggers update", () => {
+    const local = makeLocalKnowledge({ macro: "!ce-my-skill" })
+    const remote = makeRemoteKnowledge({ macro: null })
+
+    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions)
+
+    expect(plan.updates).toHaveLength(1)
+    expect(plan.unchanged).toHaveLength(0)
+  })
+
+  test("knowledge macro match is unchanged", () => {
+    const local = makeLocalKnowledge({ macro: "!ce-my-skill" })
+    const remote = makeRemoteKnowledge({ macro: "!ce-my-skill" })
+
+    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions)
+
+    expect(plan.unchanged).toHaveLength(1)
+    expect(plan.updates).toHaveLength(0)
+  })
+
+  test("knowledge null macro matches null remote macro", () => {
+    const local = makeLocalKnowledge({ macro: null })
+    const remote = makeRemoteKnowledge({ macro: null })
+
+    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions)
+
+    expect(plan.unchanged).toHaveLength(1)
+    expect(plan.updates).toHaveLength(0)
+  })
 })
