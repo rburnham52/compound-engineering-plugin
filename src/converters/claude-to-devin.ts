@@ -380,16 +380,26 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     (_match, skillName: string) => `the ${CE_PREFIX} knowledge:${skillName} knowledge entry (assets)`,
   )
   // "Load/Invoke/Run `X` skill" or "Load/Invoke/Run X skill" → knowledge entry reference
-  // Guard: skip pronouns/articles as the captured name (this, the, a, an, that, my, your)
-  const SKIP_SKILL_NAMES = /^(?:this|that|the|a|an|my|your|its|their)$/i
+  // Guard: skip pronouns/articles/prepositions and names not in refMap
+  const SKIP_SKILL_NAMES = /^(?:this|that|the|a|an|my|your|its|their|at|on|in|up|down|each|every|any|all|no|some)$/i
   result = result.replace(
     /(?:Load|Invoke|Run) [`]?([\w][\w-]*)[`]? skill\b/gi,
-    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    (_match, name: string) => {
+      if (SKIP_SKILL_NAMES.test(name)) return _match
+      const normalized = normalizeName(name)
+      if (playbookRefMap && !playbookRefMap[normalized]) return _match
+      return `Refer to the ${CE_PREFIX} knowledge:${normalized} knowledge entry`
+    },
   )
   // "Load/Invoke the X skill" (without backticks)
   result = result.replace(
     /(?:Load|Invoke) the [`"]?([\w][\w-]*)[\`"]? skill\b/gi,
-    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    (_match, name: string) => {
+      if (SKIP_SKILL_NAMES.test(name)) return _match
+      const normalized = normalizeName(name)
+      if (playbookRefMap && !playbookRefMap[normalized]) return _match
+      return `Refer to the ${CE_PREFIX} knowledge:${normalized} knowledge entry`
+    },
   )
   // "the X skill" (not followed by directory/file/path) — skip pronouns/articles and unknown names
   // Guard against false positives like "the active skill locations" by only rewriting known refMap names
@@ -451,6 +461,11 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     /(?<=→\s*)(?:Run )?`?review (docs\/[\w./\-<>]+)`?/g,
     "present `$1` to the user for review",
   )
+  // Platform-comparison bullet items: "- Claude Code: <detail>" → strip entire line
+  result = result.replace(/^\s*-\s*Claude Code:[^\n]*/gm, "")
+  // Markdown table rows where first column is "Claude Code plugins" → strip entire row
+  result = result.replace(/^\|[^|]*Claude Code plugins[^|]*\|[^\n]*/gm, "")
+
   // Claude Code-specific concepts — strip entire lines with no Devin equivalent
   result = result.replace(
     /^.*?(?:Begin implementing in Claude Code on the web|use `&` to run in background|LFG\/SLFG|ultrathink|disable-model-invocation|on remote.*?&|start work in background for Claude Code).*$/gim,
