@@ -87,7 +87,22 @@ Devin automatically creates knowledge from: README files, `AGENTS.md`, `.rules`,
 - The binding mechanism is the `macro` field on playbook or knowledge API objects
 - Setting `macro` to a command string (e.g., `"review"`) binds it as `/review`
 - The converter emits macros as `!ce_<name>` (e.g. `!ce_plan`, `!ce_work`), which Devin renders as `/ce_plan` etc.
-- Agent playbooks always have `macro: null` — they are invoked by referencing the playbook, not a slash command.
+- Agent playbooks always have `macro: null` — they are invoked via `propose_sessions`, not a slash command.
+
+### Cross-references inside playbook bodies
+
+When one playbook references another, the converter emits different patterns depending on the target type:
+
+| Target type | Has macro? | Emitted pattern |
+|---|---|---|
+| Workflow / command | Yes | `` Run `!ce_<name>` `` or `` Run `!ce_<name>` with: <args> `` |
+| Agent | No | `Use propose_sessions to start a child session with the [CE] agent:<name> playbook` |
+| Knowledge entry | — | `Refer to the [CE] knowledge:<name> knowledge entry` |
+
+Examples:
+- `` Run `!ce_plan` with: the user-provided input `` — invokes the `[CE] workflow:plan` playbook
+- `` Run `!ce_review` with: mode:autofix plan:<path> `` — invokes `[CE] workflow:review` with args
+- `Use propose_sessions to start a child session with the [CE] agent:security-sentinel playbook` — spawns an agent
 
 ## MCP servers
 
