@@ -48,17 +48,18 @@ export type DevinApiPlaybook = {
 
 export type DevinV3Page<T> = {
   items: T[]
-  has_more: boolean
-  cursor?: string
+  has_next_page: boolean
+  end_cursor: string | null
 }
 
 export type DevinApiKnowledgeEntry = {
   note_id: string
   name: string
   body: string
-  trigger_description: string
+  trigger: string
   macro: string | null
-  parent_folder_id: string | null
+  folder_id: string | null
+  folder_path: string
   pinned_repo: string | null
 }
 

@@ -114,10 +114,24 @@ async function fetchAllPages<T>(
     const page = await devinRequest<DevinV3Page<T>>(client, url)
     if (!page) break
     results.push(...page.items)
-    cursor = page.has_more ? page.cursor : undefined
+    cursor = page.has_next_page && page.end_cursor ? page.end_cursor : undefined
   } while (cursor)
 
   return results
+}
+
+function knowledgeFoldersPath(orgId: string): string {
+  return `/v3/organizations/${orgId}/knowledge/folders`
+}
+
+type DevinKnowledgeFolder = { id: string; name: string }
+type DevinKnowledgeFoldersPage = { items: DevinKnowledgeFolder[]; has_next_page: boolean; end_cursor: string | null }
+
+async function findCEFolderId(client: DevinClient): Promise<string | null> {
+  const page = await devinRequest<DevinKnowledgeFoldersPage>(client, knowledgeFoldersPath(client.orgId))
+  if (!page) return null
+  const folder = page.items.find((f) => f.name === "[CE]")
+  return folder?.id ?? null
 }
 
 // --- Local State Reader ---
@@ -205,6 +219,14 @@ async function fetchRemotePlaybooks(client: DevinClient): Promise<DevinApiPlaybo
 
 async function fetchRemoteKnowledge(client: DevinClient): Promise<DevinApiKnowledgeEntry[]> {
   return fetchAllPages<DevinApiKnowledgeEntry>(client, knowledgePath(client.orgId))
+}
+
+async function resolveCEFolderId(client: DevinClient): Promise<string | null> {
+  try {
+    return await findCEFolderId(client)
+  } catch {
+    return null
+  }
 }
 
 // --- Diff Algorithm ---
@@ -295,6 +317,7 @@ async function executeSyncPlan(
   localEntries: Map<string, LocalEntry>,
   client: DevinClient,
   options: SyncDevinOptions,
+  ceFolderId: string | null,
 ): Promise<SyncResult> {
   const result: SyncResult = { created: 0, updated: 0, deleted: 0, unchanged: plan.unchanged.length }
 
@@ -317,8 +340,9 @@ async function executeSyncPlan(
         body: {
           name: local.title,
           body: local.body,
-          trigger_description: local.triggerDescription,
+          trigger: local.triggerDescription,
           macro: local.macro ?? undefined,
+          ...(ceFolderId ? { folder_id: ceFolderId } : {}),
         },
         json: false,
       })
@@ -345,8 +369,9 @@ async function executeSyncPlan(
         body: {
           name: local.title,
           body: local.body,
-          trigger_description: local.triggerDescription,
+          trigger: local.triggerDescription,
           macro: local.macro ?? undefined,
+          ...(ceFolderId ? { folder_id: ceFolderId } : {}),
         },
         json: false,
       })
@@ -463,8 +488,16 @@ export async function syncToDevin(
     return
   }
 
+  // Resolve [CE] knowledge folder (optional — groups all CE knowledge in one folder)
+  const ceFolderId = await resolveCEFolderId(client)
+  if (ceFolderId) {
+    console.log(`\n  Using [CE] knowledge folder: ${ceFolderId}`)
+  } else if (local.knowledge.length > 0) {
+    console.log("\n  Tip: Create a '[CE]' folder in the Devin knowledge UI to group CE entries automatically.")
+  }
+
   console.log("\nExecuting...")
-  const result = await executeSyncPlan(plan, localEntries, client, options)
+  const result = await executeSyncPlan(plan, localEntries, client, options, ceFolderId)
 
   // Print summary
   console.log("\nSync complete:")

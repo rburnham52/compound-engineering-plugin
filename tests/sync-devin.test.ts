@@ -50,9 +50,10 @@ function makeRemoteKnowledge(overrides: Partial<DevinApiKnowledgeEntry> = {}): D
     note_id: "kn-1",
     name: "[CE] knowledge:test-knowledge",
     body: "Test knowledge body.",
-    trigger_description: "When working with test-knowledge",
+    trigger: "When working with test-knowledge",
     macro: null,
-    parent_folder_id: null,
+    folder_id: null,
+    folder_path: "/",
     pinned_repo: null,
     ...overrides,
   }
