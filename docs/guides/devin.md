@@ -64,8 +64,8 @@ The converter automatically rewrites Claude Code-specific references for Devin:
 - `Task tool` prose (e.g. "use the Task tool to launch agents") → `Use propose_sessions to start child sessions`
 
 **Slash commands and skill invocations**
-- `/ce:plan`, `/workflows:plan` → `` Run `!ce_plan` `` (macro invocation)
-- `` `ce:review mode:autofix` `` (bare backtick invocation) → `` Run `!ce_review` with: mode:autofix ``
+- `/ce:plan`, `/workflows:plan` → `` Run `!ce-plan` `` (macro invocation)
+- `` `ce:review mode:autofix` `` (bare backtick invocation) → `` Run `!ce-review` with: mode:autofix ``
 - `/deepen-plan` (knowledge-type skill) → `the [CE] knowledge:deepen-plan knowledge entry`
 - `Skill("compound-engineering:document-review", "mode:headless ...")` → `the [CE] knowledge:document-review knowledge entry`
 - `skill: git-worktree` (YAML-style invocation) → `Refer to the [CE] knowledge:git-worktree knowledge entry`
@@ -113,11 +113,13 @@ All entries use a `[CE] type:name` title prefix:
 | Type | Title Example | Macro |
 |------|--------------|-------|
 | Agent | `[CE] agent:security-sentinel` | _(none)_ |
-| Command | `[CE] command:deepen-plan` | `!ce_deepen_plan` |
-| Workflow | `[CE] workflow:brainstorm` | `!ce_brainstorm` |
-| Knowledge | `[CE] knowledge:dhh-rails-style` | _(none)_ |
+| Command | `[CE] command:deepen-plan` | `!deepen-plan` |
+| Workflow | `[CE] workflow:brainstorm` | `!ce-brainstorm` |
+| Knowledge | `[CE] knowledge:dhh-rails-style` | `!ce-dhh-rails-style` |
 
-Workflow macros mirror the plugin's `/ce:name` command convention — `!ce_plan` corresponds to `/ce:plan`, `!ce_work` to `/ce:work`, etc.
+All macros use **hyphens only** — both playbooks and knowledge entries follow the same rule (Devin's knowledge API does not allow underscores). The `!` prefix is required for both types.
+
+Workflow macros use a `ce-` prefix mirroring the plugin's `/ce:name` command convention — `!ce-plan` invokes `/ce:plan`, `!ce-work` invokes `/ce:work`, etc. Knowledge macros follow the same `ce-` prefix pattern.
 
 The `[CE]` prefix ensures synced entries never collide with manually-created Devin content. The sync command only touches `[CE]`-prefixed entries.
 

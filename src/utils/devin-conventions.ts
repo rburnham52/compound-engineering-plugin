@@ -6,7 +6,12 @@ export function toDevinTitle(name: string, category: string): string {
   return `${CE_PREFIX} ${category}:${name}`
 }
 
-/** Convert a hyphenated name to Devin macro format: "deepen-plan" → "deepen_plan" */
+/** Convert a name to Devin macro format (hyphens only — both playbooks and knowledge use hyphens) */
 export function toMacroName(name: string): string {
-  return name.replace(/-/g, "_")
+  return name
+}
+
+/** Convert a name to a CE-prefixed knowledge macro: "deepen-plan" → "ce-deepen-plan" */
+export function toKnowledgeMacroName(name: string): string {
+  return `ce-${name}`
 }

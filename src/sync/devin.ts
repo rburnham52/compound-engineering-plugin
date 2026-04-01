@@ -155,7 +155,7 @@ async function readLocalState(
 
       const body = await readText(filePath)
       const title = `${CE_PREFIX} ${category}:${name}`
-      const macro = category === "agent" ? null : `!ce_${toMacroName(name)}`
+      const macro = category === "agent" ? null : `!ce-${toMacroName(name)}`
 
       playbooks.push({ kind: "playbook", name, title, body: body.trim(), category, macro })
     }
@@ -171,9 +171,9 @@ async function readLocalState(
       const name = path.basename(filePath, ".json")
       if (options.only.length > 0 && !options.only.includes(name)) continue
 
-      let json: { title: string; body: string; trigger_description: string }
+      let json: { title: string; body: string; trigger_description: string; macro?: string }
       try {
-        json = await readJson<{ title: string; body: string; trigger_description: string }>(filePath)
+        json = await readJson<{ title: string; body: string; trigger_description: string; macro?: string }>(filePath)
       } catch {
         throw new Error(`Failed to parse knowledge file ${filePath}`)
       }
@@ -189,6 +189,7 @@ async function readLocalState(
         title,
         body: json.body,
         triggerDescription: json.trigger_description,
+        macro: json.macro ?? null,
       })
     }
   }
@@ -256,7 +257,9 @@ export function computeSyncPlan(
       plan.creates.push({ title: local.title, category: "knowledge" })
     } else {
       matchedRemoteKnowledgeTitles.add(local.title)
-      if (normalizeForComparison(local.body) === normalizeForComparison(remote.body)) {
+      const bodyMatch = normalizeForComparison(local.body) === normalizeForComparison(remote.body)
+      const macroMatch = (local.macro ?? null) === (remote.macro ?? null)
+      if (bodyMatch && macroMatch) {
         plan.unchanged.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
       } else {
         plan.updates.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
@@ -314,7 +317,8 @@ async function executeSyncPlan(
         body: {
           name: local.title,
           body: local.body,
-          trigger: local.triggerDescription,
+          trigger_description: local.triggerDescription,
+          macro: local.macro ?? undefined,
         },
         json: false,
       })
@@ -341,7 +345,8 @@ async function executeSyncPlan(
         body: {
           name: local.title,
           body: local.body,
-          trigger: local.triggerDescription,
+          trigger_description: local.triggerDescription,
+          macro: local.macro ?? undefined,
         },
         json: false,
       })

@@ -19,6 +19,7 @@ export type DevinKnowledgeEntry = {
   title: string
   body: string
   triggerDescription: string
+  macro?: string // Knowledge macro (hyphens only, stored without ! prefix)
 }
 
 export type DevinBundle = {
@@ -56,6 +57,7 @@ export type DevinApiKnowledgeEntry = {
   name: string
   body: string
   trigger_description: string
+  macro: string | null
   parent_folder_id: string | null
   pinned_repo: string | null
 }
@@ -77,6 +79,7 @@ export type LocalKnowledgeEntry = {
   title: string // [CE] knowledge:name
   body: string
   triggerDescription: string
+  macro: string | null
 }
 
 export type LocalEntry = LocalPlaybookEntry | LocalKnowledgeEntry

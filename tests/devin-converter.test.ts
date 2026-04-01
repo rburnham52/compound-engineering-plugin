@@ -189,7 +189,7 @@ describe("convertClaudeToDevin", () => {
 
   // --- Macro generation tests ---
 
-  test("command playbooks have macro field with underscores", () => {
+  test("command playbooks have macro field with hyphens", () => {
     const plugin: ClaudePlugin = {
       ...fixturePlugin,
       commands: [{ name: "deepen-plan", description: "Deepen a plan", body: "Do it.", sourcePath: "/tmp/c.md" }],
@@ -199,8 +199,8 @@ describe("convertClaudeToDevin", () => {
 
     const bundle = convertClaudeToDevin(plugin, defaultOptions)
 
-    expect(bundle.playbooks[0].macro).toBe("deepen_plan")
-    expect(bundle.playbooks[0].macro).not.toContain("-")
+    expect(bundle.playbooks[0].macro).toBe("deepen-plan")
+    expect(bundle.playbooks[0].macro).not.toContain("_")
   })
 
   test("agent playbooks have no macro", () => {
@@ -210,11 +210,11 @@ describe("convertClaudeToDevin", () => {
     expect(playbook!.macro).toBeUndefined()
   })
 
-  test("workflow macro has workflow_ prefix", () => {
+  test("workflow macro has workflow- prefix", () => {
     const bundle = convertClaudeToDevin(fixturePlugin, defaultOptions)
 
     const playbook = bundle.playbooks.find((p) => p.name === "plan")
-    expect(playbook!.macro).toBe("workflow_plan")
+    expect(playbook!.macro).toBe("workflow-plan")
   })
 
   // --- Workflow prefix stripping ---
@@ -796,7 +796,7 @@ Task best-practices-researcher(topic)`
     const bundle = convertClaudeToDevin(plugin, defaultOptions)
 
     expect(bundle.playbooks[0].name).toBe("brainstorm")
-    expect(bundle.playbooks[0].macro).toBe("workflow_brainstorm")
+    expect(bundle.playbooks[0].macro).toBe("workflow-brainstorm")
   })
 
   // --- Idempotency test ---
@@ -1069,21 +1069,21 @@ Task best-practices-researcher(topic)`
   // -----------------------------------------------------------------------
 
   describe("ce: slash command resolution via refMap", () => {
-    test("/ce:plan resolves to Run `!ce_plan` via refMap", () => {
+    test("/ce:plan resolves to Run `!ce-plan` via refMap", () => {
       const refMap = {
-        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
       }
       const result = transformContentForDevin("Run /ce:plan to create a plan.", refMap)
-      expect(result).toContain("Run `!ce_plan`")
+      expect(result).toContain("Run `!ce-plan`")
       expect(result).not.toContain("/ce:plan")
     })
 
-    test("/ce:review resolves to Run `!ce_review` via refMap", () => {
+    test("/ce:review resolves to Run `!ce-review` via refMap", () => {
       const refMap = {
-        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce-review" },
       }
       const result = transformContentForDevin("After work, run /ce:review to verify.", refMap)
-      expect(result).toContain("Run `!ce_review`")
+      expect(result).toContain("Run `!ce-review`")
     })
   })
 
@@ -1094,47 +1094,47 @@ Task best-practices-researcher(topic)`
   describe("macro invocation cross-references", () => {
     test("workflow ref with macro emits Run `!macro`", () => {
       const refMap = {
-        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
       }
       const result = transformContentForDevin("Run the plan playbook", refMap)
-      expect(result).toBe("Run `!ce_plan`")
+      expect(result).toBe("Run `!ce-plan`")
     })
 
     test("bare workflow ref emits Run `!macro` (not verbose title form)", () => {
       const refMap = {
-        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
+        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce-work" },
       }
       const result = transformContentForDevin("the work playbook", refMap)
-      expect(result).toBe("Run `!ce_work`")
+      expect(result).toBe("Run `!ce-work`")
       expect(result).not.toContain("[CE] workflow:work")
     })
 
     test("workflow ref with args emits Run `!macro` with: args", () => {
       const refMap = {
-        "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
-        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+        "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce-review" },
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce-review" },
       }
       const result = transformContentForDevin("the review playbook with: mode:autofix", refMap)
-      expect(result).toBe("Run `!ce_review` with: mode:autofix")
+      expect(result).toBe("Run `!ce-review` with: mode:autofix")
     })
 
-    test("backtick-wrapped `/ce:plan $ARGUMENTS` resolves to Run `!ce_plan` with: the user-provided input", () => {
+    test("backtick-wrapped `/ce:plan $ARGUMENTS` resolves to Run `!ce-plan` with: the user-provided input", () => {
       const refMap = {
-        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
       }
       const input = "`/ce:plan $ARGUMENTS`"
       const result = transformContentForDevin(input, refMap)
-      expect(result).toContain("Run `!ce_plan`")
+      expect(result).toContain("Run `!ce-plan`")
       expect(result).toContain("the user-provided input")
       expect(result).not.toContain("/ce:plan")
     })
 
     test("backtick-wrapped `/ce:review mode:autofix` resolves with args", () => {
       const refMap = {
-        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce-review" },
       }
       const result = transformContentForDevin("`/ce:review mode:autofix plan:<path>`", refMap)
-      expect(result).toContain("Run `!ce_review`")
+      expect(result).toContain("Run `!ce-review`")
       expect(result).toContain("mode:autofix plan:<path>")
     })
 
@@ -1158,33 +1158,33 @@ Task best-practices-researcher(topic)`
 
     test("'run Run `!macro`' double-verb artifact is cleaned up", () => {
       const refMap = {
-        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
-        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
       }
       const result = transformContentForDevin("if no plan exists, run the plan playbook again", refMap)
       expect(result).not.toContain("run Run")
-      expect(result).toContain("Run `!ce_plan`")
+      expect(result).toContain("Run `!ce-plan`")
     })
 
     // Rule 8 regression: 'the ce-X playbook' must never survive in output (verification Rule 8 FAIL pattern)
     test("Rule 8: 'the ce-plan playbook' does not appear when ce-plan is in refMap", () => {
       const refMap = {
-        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
-        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce-plan" },
       }
       const result = transformContentForDevin("Run the ce-plan playbook to start.", refMap)
       expect(result).not.toMatch(/the ce-plan playbook/)
-      expect(result).toContain("Run `!ce_plan`")
+      expect(result).toContain("Run `!ce-plan`")
     })
 
     test("Rule 8: 'the ce-work playbook' does not appear when ce-work is in refMap", () => {
       const refMap = {
-        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
-        "ce-work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
+        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce-work" },
+        "ce-work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce-work" },
       }
       const result = transformContentForDevin("the ce-work playbook", refMap)
       expect(result).not.toMatch(/the ce-work playbook/)
-      expect(result).toContain("Run `!ce_work`")
+      expect(result).toContain("Run `!ce-work`")
     })
   })
 
@@ -1313,7 +1313,7 @@ describe("v2 verification report regression tests", () => {
   // --- Preposition guard in skill rewrites ---
 
   test("does NOT produce 'knowledge:at' from 'bulk-load at skill start'", () => {
-    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow-review" } }
     const result = transformContentForDevin("do not bulk-load at skill start", refMap)
     expect(result).not.toContain("knowledge:at")
     expect(result).toContain("at skill start")
@@ -1332,23 +1332,23 @@ describe("v2 verification report regression tests", () => {
 describe("v3 verification report regression tests", () => {
   // --- `ce:X` bare invocations ---
 
-  test("converts `ce:review` to !ce_review macro", () => {
-    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+  test("converts `ce:review` to !ce-review macro", () => {
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow-review" } }
     const result = transformContentForDevin("Invoke `ce:review` to run reviewers.", refMap)
-    expect(result).toContain("`!workflow_review`")
+    expect(result).toContain("`!workflow-review`")
     expect(result).not.toContain("ce:review")
   })
 
   test("converts `ce:review mode:autofix` with args to macro with: args", () => {
-    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow-review" } }
     const result = transformContentForDevin("Invoke `ce:review mode:autofix` when done.", refMap)
-    expect(result).toContain("`!workflow_review`")
+    expect(result).toContain("`!workflow-review`")
     expect(result).toContain("mode:autofix")
     expect(result).not.toContain("ce:review")
   })
 
   test("leaves unknown `ce:X` invocations unchanged", () => {
-    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow-review" } }
     const result = transformContentForDevin("Run `ce:nonexistent`.", refMap)
     expect(result).toContain("`ce:nonexistent`")
   })

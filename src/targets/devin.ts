@@ -21,6 +21,7 @@ export async function writeDevinBundle(outputRoot: string, bundle: DevinBundle):
         title: entry.title,
         body: entry.body,
         trigger_description: entry.triggerDescription,
+        ...(entry.macro ? { macro: entry.macro } : {}),
       })
     }
   }

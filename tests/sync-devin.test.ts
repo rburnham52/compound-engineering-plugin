@@ -28,6 +28,7 @@ function makeLocalKnowledge(overrides: Partial<LocalKnowledgeEntry> = {}): Local
     title: "[CE] knowledge:test-knowledge",
     body: "Test knowledge body.",
     triggerDescription: "When working with test-knowledge",
+    macro: null,
     ...overrides,
   }
 }
@@ -50,6 +51,7 @@ function makeRemoteKnowledge(overrides: Partial<DevinApiKnowledgeEntry> = {}): D
     name: "[CE] knowledge:test-knowledge",
     body: "Test knowledge body.",
     trigger_description: "When working with test-knowledge",
+    macro: null,
     parent_folder_id: null,
     pinned_repo: null,
     ...overrides,
@@ -206,8 +208,8 @@ describe("computeSyncPlan", () => {
   test("multiple local playbooks with different categories", () => {
     const localPlaybooks = [
       makeLocalPlaybook({ name: "my-agent", title: "[CE] agent:my-agent", category: "agent", macro: null }),
-      makeLocalPlaybook({ name: "my-cmd", title: "[CE] command:my-cmd", category: "command", macro: "my_cmd" }),
-      makeLocalPlaybook({ name: "my-flow", title: "[CE] workflow:my-flow", category: "workflow", macro: "workflow_my_flow" }),
+      makeLocalPlaybook({ name: "my-cmd", title: "[CE] command:my-cmd", category: "command", macro: "my-cmd" }),
+      makeLocalPlaybook({ name: "my-flow", title: "[CE] workflow:my-flow", category: "workflow", macro: "workflow-my-flow" }),
     ]
 
     const plan = computeSyncPlan(localPlaybooks, [], [], [], defaultOptions)

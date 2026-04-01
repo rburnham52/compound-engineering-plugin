@@ -3,7 +3,7 @@ import { parseFrontmatter } from "../utils/frontmatter"
 import type { ClaudeAgent, ClaudeCommand, ClaudeMcpServer, ClaudePlugin, ClaudeSkill } from "../types/claude"
 import type { DevinBundle, DevinKnowledgeEntry, DevinPlaybook, DevinPlaybookSections } from "../types/devin"
 import type { ClaudeToOpenCodeOptions } from "./claude-to-opencode"
-import { CE_PREFIX, toDevinTitle, toMacroName } from "../utils/devin-conventions"
+import { CE_PREFIX, toDevinTitle, toKnowledgeMacroName, toMacroName } from "../utils/devin-conventions"
 
 export type ClaudeToDevinOptions = ClaudeToOpenCodeOptions
 
@@ -30,7 +30,7 @@ export function convertClaudeToDevin(
     const isWorkflow = command.name.startsWith("workflows:")
     const name = isWorkflow ? fullName.replace(/^workflows-/, "") : fullName
     const category = isWorkflow ? "workflow" : "command" as const
-    const macro = isWorkflow ? `workflow_${toMacroName(name)}` : toMacroName(name)
+    const macro = isWorkflow ? `workflow-${toMacroName(name)}` : toMacroName(name)
     playbookRefMap[name] = { title: toDevinTitle(name, category), category, macro }
     if (isWorkflow) playbookRefMap[fullName] = { title: toDevinTitle(name, "workflow"), category: "workflow", macro }
   }
@@ -39,7 +39,7 @@ export function convertClaudeToDevin(
   for (const skill of plugin.skills) {
     if (isWorkflowSkill(skill.name)) {
       const name = workflowSkillName(skill.name)
-      const macro = `ce_${toMacroName(name)}`
+      const macro = `ce-${toMacroName(name)}`
       const ref: PlaybookRef = { title: toDevinTitle(name, "workflow"), category: "workflow", macro }
       playbookRefMap[name] = ref
       // Also register the namespaced alias (e.g. "ce-plan") so step 4a output
@@ -156,7 +156,7 @@ function convertCommandToPlaybook(
 
   const title = toDevinTitle(name, category)
   const macro = category === "workflow"
-    ? `workflow_${toMacroName(name)}`
+    ? `workflow-${toMacroName(name)}`
     : toMacroName(name)
 
   const content = formatPlaybook(title, sections)
@@ -196,7 +196,9 @@ function convertSkillToKnowledge(
 
   const title = toDevinTitle(name, "knowledge")
 
-  return { name, title, body, triggerDescription }
+  const macro = `!${toKnowledgeMacroName(name)}`
+
+  return { name, title, body, triggerDescription, macro }
 }
 
 function isWorkflowSkill(skillName: string): boolean {
@@ -239,7 +241,7 @@ function convertSkillToPlaybook(
     sections.neededFromUser = `Provide: ${skill.argumentHint}`
   }
 
-  const macro = `ce_${toMacroName(name)}`
+  const macro = `ce-${toMacroName(name)}`
   const content = formatPlaybook(title, sections)
   return { name, content, category: "workflow", macro }
 }
