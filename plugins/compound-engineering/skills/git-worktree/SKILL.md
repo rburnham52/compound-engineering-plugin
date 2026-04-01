@@ -152,10 +152,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-manager.sh clean
 ### Code Review with Worktree
 
 ```bash
-# Claude Code recognizes you're not on the PR branch
-# Offers: "Use worktree for isolated review? (y/n)"
-
-# You respond: yes
+# You're not on the PR branch — use a worktree for isolated review
 # Script runs (copies .env files automatically):
 bash ${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-manager.sh create pr-123-feature-name
 

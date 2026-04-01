@@ -20,7 +20,7 @@ Scan `.context/compound-engineering/todos/*.md` and legacy `todos/*.md`. Partiti
 
 If a specific todo ID or pattern was passed as an argument, filter to matching todos only (still must be `ready`).
 
-Residual actionable work from `ce:review mode:autofix` after its `safe_auto` pass will already be `ready`.
+Residual actionable work from `/ce:review mode:autofix` after its `safe_auto` pass will already be `ready`.
 
 Skip any todo that recommends deleting, removing, or gitignoring files in `docs/brainstorms/`, `docs/plans/`, or `docs/solutions/` — these are intentional pipeline artifacts.
 
@@ -44,9 +44,9 @@ GATE: STOP. Verify todos resolved and changes committed before proceeding.
 
 ### 5. Compound on Lessons Learned
 
-Load the `ce:compound` skill to document what was learned. Todo resolutions often surface patterns and architectural insights worth capturing.
+Run `/ce:compound` to document what was learned. Todo resolutions often surface patterns and architectural insights worth capturing.
 
-GATE: STOP. Verify the compound skill produced a solution document in `docs/solutions/`. If none (user declined or no learnings), continue.
+GATE: STOP. Verify a solution document was produced in `docs/solutions/`. If none (user declined or no learnings), continue.
 
 ### 6. Clean Up
 

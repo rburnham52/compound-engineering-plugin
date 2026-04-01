@@ -22,19 +22,13 @@ Conduct a comprehensive review of the codebase against agent-native architecture
 
 ## Workflow
 
-### Step 1: Load the Agent-Native Skill
+### Step 1: Review Agent-Native Principles
 
-First, invoke the agent-native-architecture skill to understand all principles:
-
-```
-/compound-engineering:agent-native-architecture
-```
-
-Select option 7 (action parity) to load the full reference material.
+Review the 8 core agent-native architecture principles listed in **Core Principles to Audit** above before launching sub-agents. Each principle has a clear definition and scoring format in the sub-agent prompts below.
 
 ### Step 2: Launch Parallel Sub-Agents
 
-Launch 8 parallel sub-agents using the Task tool with `subagent_type: Explore`, one for each principle. Each agent should:
+Launch 8 parallel sub-agents using propose_sessions, one for each principle. Each agent should:
 
 1. Enumerate ALL instances in the codebase (user actions, tools, contexts, data stores, etc.)
 2. Check compliance against the principle

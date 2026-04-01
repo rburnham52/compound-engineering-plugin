@@ -418,6 +418,37 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     (_match, name: string) => `the ${CE_PREFIX} knowledge:${name} knowledge entry`,
   )
 
+  // 7b. Bare `ce:command [args]` invocations (no leading /) → macro or knowledge ref
+  // e.g. `ce:review`, `ce:review mode:autofix`, `ce:compound`
+  result = result.replace(
+    /`ce:([\w-]+)([^`]*)`/g,
+    (_match, cmd: string, args: string) => {
+      const normalized = normalizeName(cmd)
+      const ref = playbookRefMap?.[normalized]
+      if (!ref) return _match
+      const argsPart = args.trim()
+      if (ref.macro) return argsPart ? `\`!${ref.macro}\` with: ${argsPart}` : `\`!${ref.macro}\``
+      if (ref.category === "knowledge") return `the ${CE_PREFIX} knowledge:${normalized} knowledge entry`
+      return `the ${ref.title} playbook`
+    },
+  )
+
+  // 7b2. Inline skill invocations: Skill("compound-engineering:name", args) → knowledge entry
+  result = result.replace(
+    /Skill\("compound-engineering:([\w-]+)"([^)]*?)\)/g,
+    (_match, name: string, args: string) => {
+      const normalized = normalizeName(name)
+      const argsPart = args.trim().replace(/^,\s*/, "")
+      if (argsPart) return `the ${CE_PREFIX} knowledge:${normalized} knowledge entry with: ${argsPart}`
+      return `the ${CE_PREFIX} knowledge:${normalized} knowledge entry`
+    },
+  )
+  // 7c. YAML-style skill invocations: "skill: name" → knowledge entry ref
+  result = result.replace(
+    /^(\s*)skill:\s*([\w-]+)/gm,
+    (_match, indent: string, name: string) => `${indent}Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+  )
+
   // 8. Claude Code tool rewrites
   // **AskUserQuestion tool** (bold markdown variant — match first, more specific)
   result = result.replace(
@@ -465,6 +496,17 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
   result = result.replace(/^\s*-\s*Claude Code:[^\n]*/gm, "")
   // Markdown table rows where first column is "Claude Code plugins" → strip entire row
   result = result.replace(/^\|[^|]*Claude Code plugins[^|]*\|[^\n]*/gm, "")
+  // Strip lines containing /model slash command (Claude Code model switcher)
+  result = result.replace(/^[^\n]*\/model\b[^\n]*/gm, "")
+  // 'Claude Code's Bash' → 'agent shell tools'
+  result = result.replace(/\bClaude Code's Bash\b/gi, "agent shell tools")
+
+  // Task tool prose references → propose_sessions pattern
+  // Matches variants: "use the Task tool", "using the Task tool", "Launch N agents using the Task tool"
+  result = result.replace(
+    /(?:use (?:the )?Task tool to (?:launch|run|invoke|spawn|start)|(?:launch(?:ing)?|spawn(?:ing)?|run(?:ning)?) [^.\n]*using the Task tool)[^.\n]*/gi,
+    "Use propose_sessions to start child sessions",
+  )
 
   // Claude Code-specific concepts — strip entire lines with no Devin equivalent
   result = result.replace(
