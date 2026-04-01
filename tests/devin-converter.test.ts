@@ -1038,6 +1038,27 @@ Task best-practices-researcher(topic)`
       expect(result).not.toContain("run Run")
       expect(result).toContain("Run `!ce_plan`")
     })
+
+    // Rule 8 regression: 'the ce-X playbook' must never survive in output (verification Rule 8 FAIL pattern)
+    test("Rule 8: 'the ce-plan playbook' does not appear when ce-plan is in refMap", () => {
+      const refMap = {
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+      }
+      const result = transformContentForDevin("Run the ce-plan playbook to start.", refMap)
+      expect(result).not.toMatch(/the ce-plan playbook/)
+      expect(result).toContain("Run `!ce_plan`")
+    })
+
+    test("Rule 8: 'the ce-work playbook' does not appear when ce-work is in refMap", () => {
+      const refMap = {
+        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
+        "ce-work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
+      }
+      const result = transformContentForDevin("the ce-work playbook", refMap)
+      expect(result).not.toMatch(/the ce-work playbook/)
+      expect(result).toContain("Run `!ce_work`")
+    })
   })
 
   // -----------------------------------------------------------------------
