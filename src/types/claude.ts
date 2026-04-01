@@ -29,6 +29,7 @@ export type ClaudeAgent = {
   description?: string
   capabilities?: string[]
   model?: string
+  excludeFrom?: string[]
   body: string
   sourcePath: string
 }
@@ -40,6 +41,7 @@ export type ClaudeCommand = {
   model?: string
   allowedTools?: string[]
   disableModelInvocation?: boolean
+  excludeFrom?: string[]
   body: string
   sourcePath: string
 }
@@ -49,6 +51,7 @@ export type ClaudeSkill = {
   description?: string
   argumentHint?: string
   disableModelInvocation?: boolean
+  excludeFrom?: string[]
   sourceDir: string
   skillPath: string
 }

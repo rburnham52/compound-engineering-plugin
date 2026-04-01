@@ -67,6 +67,7 @@ async function loadAgents(agentsDirs: string[]): Promise<ClaudeAgent[]> {
       description: data.description as string | undefined,
       capabilities: data.capabilities as string[] | undefined,
       model: data.model as string | undefined,
+      excludeFrom: parseExcludeFrom(data["exclude-from"]),
       body: body.trim(),
       sourcePath: file,
     })
@@ -91,6 +92,7 @@ async function loadCommands(commandsDirs: string[]): Promise<ClaudeCommand[]> {
       model: data.model as string | undefined,
       allowedTools,
       disableModelInvocation,
+      excludeFrom: parseExcludeFrom(data["exclude-from"]),
       body: body.trim(),
       sourcePath: file,
     })
@@ -112,6 +114,7 @@ async function loadSkills(skillsDirs: string[]): Promise<ClaudeSkill[]> {
       description: data.description as string | undefined,
       argumentHint: data["argument-hint"] as string | undefined,
       disableModelInvocation,
+      excludeFrom: parseExcludeFrom(data["exclude-from"]),
       sourceDir: path.dirname(file),
       skillPath: file,
     })
@@ -175,6 +178,20 @@ function parseAllowedTools(value: unknown): string[] | undefined {
     return value
       .split(/,/)
       .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return undefined
+}
+
+function parseExcludeFrom(value: unknown): string[] | undefined {
+  if (!value) return undefined
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).toLowerCase())
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/,/)
+      .map((item) => item.trim().toLowerCase())
       .filter(Boolean)
   }
   return undefined

@@ -53,19 +53,25 @@ export function convertClaudeToDevin(
   }
 
   // Convert: single pass with ref map available
+  // Filter out any components excluded from the devin target via `exclude-from: [devin]` frontmatter
+  const isExcluded = (item: { excludeFrom?: string[] }) => item.excludeFrom?.includes("devin") ?? false
+
   const playbooks: DevinPlaybook[] = []
 
   for (const agent of plugin.agents) {
+    if (isExcluded(agent)) continue
     playbooks.push(convertAgentToPlaybook(agent, usedPlaybookNames, playbookRefMap))
   }
 
   for (const command of plugin.commands) {
+    if (isExcluded(command)) continue
     playbooks.push(convertCommandToPlaybook(command, usedPlaybookNames, playbookRefMap))
   }
 
   // Skills with ce:/workflows: prefix → workflow playbooks; rest → knowledge entries
   const knowledgeEntries: DevinKnowledgeEntry[] = []
   for (const skill of plugin.skills) {
+    if (isExcluded(skill)) continue
     if (isWorkflowSkill(skill.name)) {
       playbooks.push(convertSkillToPlaybook(skill, usedPlaybookNames, playbookRefMap))
     } else {

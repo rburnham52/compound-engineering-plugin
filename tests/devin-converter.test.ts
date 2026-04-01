@@ -457,6 +457,121 @@ describe("convertClaudeToDevin", () => {
     expect(names).toContain("reviewer")
     expect(names).toContain("reviewer-2")
   })
+
+  // -----------------------------------------------------------------------
+  // EXCLUDE-FROM FILTERING
+  // -----------------------------------------------------------------------
+
+  describe("exclude-from: [devin] filtering", () => {
+    test("skill with exclude-from: [devin] is absent from knowledge entries", () => {
+      const plugin: ClaudePlugin = {
+        ...fixturePlugin,
+        agents: [],
+        commands: [],
+        skills: [
+          {
+            name: "orchestrating-swarms",
+            description: "Claude Code specific",
+            excludeFrom: ["devin"],
+            sourceDir: "/tmp/plugin/skills/orchestrating-swarms",
+            skillPath: "/tmp/plugin/skills/orchestrating-swarms/SKILL.md",
+          },
+          {
+            name: "dhh-rails-style",
+            description: "Rails style",
+            sourceDir: "/tmp/plugin/skills/dhh-rails-style",
+            skillPath: "/tmp/plugin/skills/dhh-rails-style/SKILL.md",
+          },
+        ],
+      }
+
+      const bundle = convertClaudeToDevin(plugin, defaultOptions)
+
+      const names = bundle.knowledgeEntries.map((k) => k.name)
+      expect(names).not.toContain("orchestrating-swarms")
+      expect(names).toContain("dhh-rails-style")
+    })
+
+    test("agent with exclude-from: [devin] is absent from playbooks", () => {
+      const plugin: ClaudePlugin = {
+        ...fixturePlugin,
+        agents: [
+          {
+            name: "claude-only-agent",
+            description: "Claude Code specific agent",
+            excludeFrom: ["devin"],
+            body: "Do Claude things.",
+            sourcePath: "/tmp/a.md",
+          },
+          {
+            name: "generic-agent",
+            description: "Works everywhere",
+            body: "Do generic things.",
+            sourcePath: "/tmp/b.md",
+          },
+        ],
+        commands: [],
+        skills: [],
+      }
+
+      const bundle = convertClaudeToDevin(plugin, defaultOptions)
+
+      const names = bundle.playbooks.map((p) => p.name)
+      expect(names).not.toContain("claude-only-agent")
+      expect(names).toContain("generic-agent")
+    })
+
+    test("command with exclude-from: [devin] is absent from playbooks", () => {
+      const plugin: ClaudePlugin = {
+        ...fixturePlugin,
+        agents: [],
+        commands: [
+          {
+            name: "claude-only-cmd",
+            description: "Claude Code only",
+            excludeFrom: ["devin"],
+            body: "Do Claude things.",
+            sourcePath: "/tmp/c.md",
+          },
+          {
+            name: "shared-cmd",
+            description: "Works everywhere",
+            body: "Do shared things.",
+            sourcePath: "/tmp/d.md",
+          },
+        ],
+        skills: [],
+      }
+
+      const bundle = convertClaudeToDevin(plugin, defaultOptions)
+
+      const names = bundle.playbooks.map((p) => p.name)
+      expect(names).not.toContain("claude-only-cmd")
+      expect(names).toContain("shared-cmd")
+    })
+
+    test("exclude-from: [codex] does NOT exclude from devin", () => {
+      const plugin: ClaudePlugin = {
+        ...fixturePlugin,
+        agents: [],
+        commands: [],
+        skills: [
+          {
+            name: "codex-excluded",
+            description: "Excluded from codex only",
+            excludeFrom: ["codex"],
+            sourceDir: "/tmp/plugin/skills/codex-excluded",
+            skillPath: "/tmp/plugin/skills/codex-excluded/SKILL.md",
+          },
+        ],
+      }
+
+      const bundle = convertClaudeToDevin(plugin, defaultOptions)
+
+      const names = bundle.knowledgeEntries.map((k) => k.name)
+      expect(names).toContain("codex-excluded")
+    })
+  })
 })
 
 describe("transformContentForDevin", () => {
