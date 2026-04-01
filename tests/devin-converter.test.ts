@@ -942,21 +942,101 @@ Task best-practices-researcher(topic)`
   // -----------------------------------------------------------------------
 
   describe("ce: slash command resolution via refMap", () => {
-    test("/ce:plan resolves to [CE] workflow:plan playbook via refMap", () => {
+    test("/ce:plan resolves to Run `!ce_plan` via refMap", () => {
       const refMap = {
-        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
       }
       const result = transformContentForDevin("Run /ce:plan to create a plan.", refMap)
-      expect(result).toContain("[CE] workflow:plan")
+      expect(result).toContain("Run `!ce_plan`")
       expect(result).not.toContain("/ce:plan")
     })
 
-    test("/ce:review resolves to [CE] workflow:review playbook via refMap", () => {
+    test("/ce:review resolves to Run `!ce_review` via refMap", () => {
       const refMap = {
-        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const },
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
       }
       const result = transformContentForDevin("After work, run /ce:review to verify.", refMap)
-      expect(result).toContain("[CE] workflow:review")
+      expect(result).toContain("Run `!ce_review`")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // MACRO INVOCATION CROSS-REFERENCES
+  // -----------------------------------------------------------------------
+
+  describe("macro invocation cross-references", () => {
+    test("workflow ref with macro emits Run `!macro`", () => {
+      const refMap = {
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+      }
+      const result = transformContentForDevin("Run the plan playbook", refMap)
+      expect(result).toBe("Run `!ce_plan`")
+    })
+
+    test("bare workflow ref emits Run `!macro` (not verbose title form)", () => {
+      const refMap = {
+        "work": { title: "[CE] workflow:work", category: "workflow" as const, macro: "ce_work" },
+      }
+      const result = transformContentForDevin("the work playbook", refMap)
+      expect(result).toBe("Run `!ce_work`")
+      expect(result).not.toContain("[CE] workflow:work")
+    })
+
+    test("workflow ref with args emits Run `!macro` with: args", () => {
+      const refMap = {
+        "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+      }
+      const result = transformContentForDevin("the review playbook with: mode:autofix", refMap)
+      expect(result).toBe("Run `!ce_review` with: mode:autofix")
+    })
+
+    test("backtick-wrapped `/ce:plan $ARGUMENTS` resolves to Run `!ce_plan` with: the user-provided input", () => {
+      const refMap = {
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+      }
+      const input = "`/ce:plan $ARGUMENTS`"
+      const result = transformContentForDevin(input, refMap)
+      expect(result).toContain("Run `!ce_plan`")
+      expect(result).toContain("the user-provided input")
+      expect(result).not.toContain("/ce:plan")
+    })
+
+    test("backtick-wrapped `/ce:review mode:autofix` resolves with args", () => {
+      const refMap = {
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "ce_review" },
+      }
+      const result = transformContentForDevin("`/ce:review mode:autofix plan:<path>`", refMap)
+      expect(result).toContain("Run `!ce_review`")
+      expect(result).toContain("mode:autofix plan:<path>")
+    })
+
+    test("agent ref (no macro) still emits propose_sessions", () => {
+      const refMap = {
+        "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const },
+      }
+      const result = transformContentForDevin("Run the security-sentinel playbook with: context", refMap)
+      expect(result).toContain("propose_sessions")
+      expect(result).toContain("[CE] agent:security-sentinel")
+      expect(result).not.toContain("!security")
+    })
+
+    test("agent bare ref (no macro, no args) keeps titled form", () => {
+      const refMap = {
+        "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const },
+      }
+      const result = transformContentForDevin("the security-sentinel playbook", refMap)
+      expect(result).toBe("the [CE] agent:security-sentinel playbook")
+    })
+
+    test("'run Run `!macro`' double-verb artifact is cleaned up", () => {
+      const refMap = {
+        "plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const, macro: "ce_plan" },
+      }
+      const result = transformContentForDevin("if no plan exists, run the plan playbook again", refMap)
+      expect(result).not.toContain("run Run")
+      expect(result).toContain("Run `!ce_plan`")
     })
   })
 

@@ -22,6 +22,7 @@ export function convertClaudeToDevin(
 
   for (const agent of plugin.agents) {
     const name = normalizeName(agent.name)
+    // Agents have no macro — they are invoked via propose_sessions
     playbookRefMap[name] = { title: toDevinTitle(name, "agent"), category: "agent" }
   }
   for (const command of plugin.commands) {
@@ -29,15 +30,22 @@ export function convertClaudeToDevin(
     const isWorkflow = command.name.startsWith("workflows:")
     const name = isWorkflow ? fullName.replace(/^workflows-/, "") : fullName
     const category = isWorkflow ? "workflow" : "command" as const
-    playbookRefMap[name] = { title: toDevinTitle(name, category), category }
-    if (isWorkflow) playbookRefMap[fullName] = { title: toDevinTitle(name, "workflow"), category: "workflow" }
+    const macro = isWorkflow ? `workflow_${toMacroName(name)}` : toMacroName(name)
+    playbookRefMap[name] = { title: toDevinTitle(name, category), category, macro }
+    if (isWorkflow) playbookRefMap[fullName] = { title: toDevinTitle(name, "workflow"), category: "workflow", macro }
   }
   // Skills with ce: or workflows: prefix are workflow commands — add to refMap
   // Other skills become knowledge entries — also add so /skill-name refs resolve
   for (const skill of plugin.skills) {
     if (isWorkflowSkill(skill.name)) {
       const name = workflowSkillName(skill.name)
-      playbookRefMap[name] = { title: toDevinTitle(name, "workflow"), category: "workflow" }
+      const macro = `ce_${toMacroName(name)}`
+      const ref: PlaybookRef = { title: toDevinTitle(name, "workflow"), category: "workflow", macro }
+      playbookRefMap[name] = ref
+      // Also register the namespaced alias (e.g. "ce-plan") so step 4a output
+      // "the ce-plan playbook" resolves correctly in step 9
+      const namespacedAlias = normalizeName(skill.name) // ce:plan → "ce-plan"
+      if (namespacedAlias !== name) playbookRefMap[namespacedAlias] = ref
     } else {
       const name = normalizeName(skill.name)
       playbookRefMap[name] = { title: toDevinTitle(name, "knowledge"), category: "knowledge" as const }
@@ -61,7 +69,7 @@ export function convertClaudeToDevin(
     if (isWorkflowSkill(skill.name)) {
       playbooks.push(convertSkillToPlaybook(skill, usedPlaybookNames, playbookRefMap))
     } else {
-      knowledgeEntries.push(convertSkillToKnowledge(skill, usedKnowledgeNames))
+      knowledgeEntries.push(convertSkillToKnowledge(skill, usedKnowledgeNames, playbookRefMap))
     }
   }
 
@@ -82,7 +90,11 @@ export function convertClaudeToDevin(
   return { playbooks, knowledgeEntries, mcpSetupInstructions }
 }
 
-type PlaybookRef = { title: string; category: "agent" | "command" | "workflow" | "knowledge" }
+export type PlaybookRef = {
+  title: string
+  category: "agent" | "workflow" | "command" | "knowledge"
+  macro?: string
+}
 
 function convertAgentToPlaybook(
   agent: ClaudeAgent,
@@ -141,7 +153,11 @@ function convertCommandToPlaybook(
   return { name, content, category, macro }
 }
 
-function convertSkillToKnowledge(skill: ClaudeSkill, usedNames: Set<string>): DevinKnowledgeEntry {
+function convertSkillToKnowledge(
+  skill: ClaudeSkill,
+  usedNames: Set<string>,
+  playbookRefMap: Record<string, PlaybookRef>,
+): DevinKnowledgeEntry {
   const name = uniqueName(normalizeName(skill.name), usedNames)
 
   // Read skill body from SKILL.md file
@@ -149,7 +165,7 @@ function convertSkillToKnowledge(skill: ClaudeSkill, usedNames: Set<string>): De
   try {
     const raw = readFileSync(skill.skillPath, "utf-8")
     const parsed = parseFrontmatter(raw)
-    body = transformContentForDevin(parsed.body.trim())
+    body = transformContentForDevin(parsed.body.trim(), playbookRefMap)
   } catch {
     body = `Knowledge converted from the ${skill.name} skill.`
     console.warn(`Warning: Could not read skill file at ${skill.skillPath}. Using default body.`)
@@ -299,8 +315,15 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
   })
 
   // 4. Transform slash command references
-  // 4a. /namespace:command — only at start of word (not inside file paths like app/services/foo.rb:42)
-  // Require slash to be preceded by whitespace, start-of-line, or opening punctuation
+  // 4a-pre. Backtick-wrapped `/namespace:command args` as a unit → "the X playbook with args: Y"
+  // Must run BEFORE bare /namespace:command and BEFORE $ARGUMENTS rewrite so args are preserved intact
+  result = result.replace(/`\/([\w-]+):([\w-]+)([^`\n]*)`/g, (_match, namespace: string, command: string, rest: string) => {
+    const name = `${normalizeName(namespace)}-${normalizeName(command)}`
+    const args = rest.trim()
+    if (args) return `the ${name} playbook with args: ${args}`
+    return `the ${name} playbook`
+  })
+  // 4a. /namespace:command (bare, not in backticks) — only after whitespace/start/punctuation
   result = result.replace(/(?<=^|[\s(`'"\)])\/([\w-]+):([\w-]+)/gm, (_match, namespace: string, command: string) => {
     return `the ${normalizeName(namespace)}-${normalizeName(command)} playbook`
   })
@@ -456,15 +479,36 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
   )
 
   // 9. Playbook cross-references (LAST — consumes "the X playbook" text from earlier transforms)
+  // Dispatch rules:
+  //   - knowledge entries → "the [CE] knowledge:X knowledge entry"
+  //   - workflow/command playbooks with macro → Run `!macro` (inline invocation)
+  //   - agent playbooks (no macro) → propose_sessions child session
   if (playbookRefMap) {
+    // 9a. Handle "the X playbook with args: Y" pattern (from backtick-wrapped slash commands)
     result = result.replace(
-      /(?:(Run|Use propose_sessions to start a child session with) )?the ([\w-]+) playbook(?: with: (.+))?/gi,
+      /the ([\.\w-]+) playbook with args: ([^\n]+)/gi,
+      (_match, name: string, args: string) => {
+        const ref = playbookRefMap[name.toLowerCase()]
+        if (!ref) return _match
+        if (ref.macro) return `Run \`!${ref.macro}\` with: ${args.trim()}`
+        return `Use propose_sessions to start a child session with the ${ref.title} playbook, passing: ${args.trim()}`
+      },
+    )
+    // 9b. General "[Run/Use propose_sessions] the X playbook [with: args]" pattern
+    result = result.replace(
+      /(?:(Run|Use propose_sessions to start a child session with) )?the ([\.\w-]+) playbook(?: with: (.+))?/gi,
       (_match, run: string | undefined, name: string, args: string | undefined) => {
         const ref = playbookRefMap[name.toLowerCase()]
         if (!ref) return _match // preserve original text for unknown names
         if (ref.category === "knowledge") {
           return `the ${ref.title} knowledge entry`
         }
+        if (ref.macro) {
+          // Workflow/command: use inline macro invocation
+          if (args) return `Run \`!${ref.macro}\` with: ${args}`
+          return `Run \`!${ref.macro}\``
+        }
+        // Agent (no macro): use propose_sessions
         if (run || args) {
           return `Use propose_sessions to start a child session with the ${ref.title} playbook${args ? `, passing: ${args}` : ""}`
         }
@@ -473,8 +517,10 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     )
   }
 
-  // 10. Clean up double "the the" artifacts from substitution chains
+  // 10. Clean up artifacts from substitution chains
   result = result.replace(/\bthe the\b/gi, "the")
+  // "run Run `!macro`" → "Run `!macro`" (GATE text 'run' + step 9 'Run')
+  result = result.replace(/\brun (Run `!)/gi, "$1")
 
   // 11. Fix verb mismatches around knowledge entries
   // "Run `the [CE] knowledge:X knowledge entry`" → "Refer to the [CE] knowledge:X knowledge entry"
