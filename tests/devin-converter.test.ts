@@ -693,6 +693,316 @@ Task best-practices-researcher(topic)`
     const second = transformContentForDevin(first, refMap)
     expect(second).toBe(first)
   })
+
+  // -----------------------------------------------------------------------
+  // FALSE POSITIVE GUARDS — things that must NOT be transformed
+  // -----------------------------------------------------------------------
+
+  describe("open command — false positive guards", () => {
+    test("does NOT mangle 'agent-browser open https://...' CLI command", () => {
+      const result = transformContentForDevin("Run: agent-browser open https://example.com")
+      expect(result).toContain("agent-browser open https://example.com")
+      expect(result).not.toContain("present https")
+      expect(result).not.toContain("present http")
+    })
+
+    test("does NOT mangle 'agent-browser open http://localhost:PORT'", () => {
+      const result = transformContentForDevin("agent-browser open http://localhost:${PORT}")
+      expect(result).toContain("agent-browser open http://localhost:${PORT}")
+    })
+
+    test("does NOT mangle 'open PR' adjective usage", () => {
+      const result = transformContentForDevin("Check for an open PR before pushing.")
+      expect(result).toContain("open PR")
+      expect(result).not.toContain("present PR")
+    })
+
+    test("does NOT mangle 'open pull request' adjective usage", () => {
+      const result = transformContentForDevin("If an open pull request exists, update it.")
+      expect(result).toContain("open pull request")
+      expect(result).not.toContain("present pull")
+    })
+
+    test("does NOT mangle 'open issues' adjective usage", () => {
+      const result = transformContentForDevin("List all open issues in the repository.")
+      expect(result).toContain("open issues")
+      expect(result).not.toContain("present issues")
+    })
+
+    test("does NOT mangle 'No open or recently closed issues'", () => {
+      const result = transformContentForDevin("No open or recently closed issues found.")
+      expect(result).toContain("No open or recently closed issues")
+    })
+
+    test("does NOT mangle https:// URLs (protocol slashes)", () => {
+      const result = transformContentForDevin("Visit https://github.com/example/repo")
+      expect(result).not.toContain("present https")
+      expect(result).toContain("https://github.com")
+    })
+
+    test("DOES rewrite 'Run `open ./docs/plan.md`' local path desktop command", () => {
+      const result = transformContentForDevin("Run `open ./docs/plan.md` to view the file")
+      expect(result).toContain("present ./docs/plan.md to the user")
+      expect(result).not.toContain("Run `open ./docs/plan.md`")
+    })
+
+    test("DOES rewrite 'xdg-open ./output.html'", () => {
+      const result = transformContentForDevin("Run xdg-open ./output.html to preview")
+      expect(result).toContain("present ./output.html to the user")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // CLAUDE.md dedup edge cases
+  // -----------------------------------------------------------------------
+
+  describe("CLAUDE.md → AGENTS.md dedup", () => {
+    test("collapses 'CLAUDE.md, AGENTS.md' to single AGENTS.md", () => {
+      const result = transformContentForDevin("Read CLAUDE.md, AGENTS.md for conventions.")
+      expect(result).toContain("AGENTS.md")
+      expect(result).not.toMatch(/AGENTS\.md.*AGENTS\.md/)
+    })
+
+    test("collapses 'AGENTS.md, CLAUDE.md' (reversed order) to single AGENTS.md", () => {
+      const result = transformContentForDevin("(AGENTS.md, CLAUDE.md, or similar)")
+      expect(result).not.toMatch(/AGENTS\.md.*AGENTS\.md/)
+    })
+
+    test("collapses 'CLAUDE.md and AGENTS.md' to single AGENTS.md", () => {
+      const result = transformContentForDevin("Check CLAUDE.md and AGENTS.md for config.")
+      expect(result).not.toMatch(/AGENTS\.md.*AGENTS\.md/)
+    })
+
+    test("collapses already-doubled 'AGENTS.md, AGENTS.md' (prior bad convert)", () => {
+      const result = transformContentForDevin("See AGENTS.md, AGENTS.md for details.")
+      expect(result).not.toMatch(/AGENTS\.md, AGENTS\.md/)
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // SKILL PRONOUN GUARDS — must not produce knowledge:this / knowledge:the
+  // -----------------------------------------------------------------------
+
+  describe("skill pronoun guards", () => {
+    test("does NOT produce 'knowledge:this' from 'Refer to this skill'", () => {
+      const result = transformContentForDevin("Refer to this skill directly from bash.")
+      expect(result).not.toContain("knowledge:this")
+    })
+
+    test("does NOT produce 'knowledge:the' from 'Load the skill'", () => {
+      const result = transformContentForDevin("Load the skill and apply it.")
+      expect(result).not.toContain("knowledge:the")
+    })
+
+    test("does NOT produce 'knowledge:a' from 'Run a skill'", () => {
+      const result = transformContentForDevin("Run a skill if available.")
+      expect(result).not.toContain("knowledge:a")
+    })
+
+    test("does NOT produce 'knowledge:your' from 'Use your skill'", () => {
+      const result = transformContentForDevin("Use your skill to complete the task.")
+      expect(result).not.toContain("knowledge:your")
+    })
+
+    test("DOES rewrite named skill 'Run git-worktree skill'", () => {
+      const result = transformContentForDevin("Run git-worktree skill to manage branches.")
+      expect(result).toContain("[CE] knowledge:git-worktree knowledge entry")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // compound-engineering:category:name PROSE REFS
+  // -----------------------------------------------------------------------
+
+  describe("compound-engineering namespace prose refs", () => {
+    test("converts 'compound-engineering:workflow:pr-comment-resolver' to [CE] agent ref", () => {
+      const result = transformContentForDevin("Spawn a compound-engineering:workflow:pr-comment-resolver agent for each thread.")
+      expect(result).toContain("[CE] agent:pr-comment-resolver")
+      expect(result).not.toContain("compound-engineering:workflow:pr-comment-resolver")
+    })
+
+    test("converts 'compound-engineering:research:best-practices-researcher'", () => {
+      const result = transformContentForDevin("Use compound-engineering:research:best-practices-researcher for context.")
+      expect(result).toContain("[CE] agent:best-practices-researcher")
+    })
+
+    test("converts multiple compound-engineering refs in same line", () => {
+      const result = transformContentForDevin(
+        "Spawn compound-engineering:document-review:coherence-reviewer and compound-engineering:document-review:feasibility-reviewer"
+      )
+      expect(result).toContain("[CE] agent:coherence-reviewer")
+      expect(result).toContain("[CE] agent:feasibility-reviewer")
+      expect(result).not.toContain("compound-engineering:")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // CLAUDE CODE PLATFORM HINTS
+  // -----------------------------------------------------------------------
+
+  describe("Claude Code platform hints", () => {
+    test("strips inline platform hint '(e.g., Ask the user in Claude Code, ...)'", () => {
+      const result = transformContentForDevin(
+        "Ask the user (e.g., Ask the user in Claude Code, request_user_input in Codex, ask_user in Gemini) for the value."
+      )
+      expect(result).not.toContain("in Claude Code")
+      expect(result).not.toContain("request_user_input in Codex")
+      expect(result).not.toContain("ask_user in Gemini")
+    })
+
+    test("strips 'in Claude Code' fragment from prose", () => {
+      const result = transformContentForDevin("Use the blocking question tool in Claude Code to ask.")
+      expect(result).not.toContain("in Claude Code")
+    })
+
+    test("strips 'for Claude Code' fragment", () => {
+      const result = transformContentForDevin("This feature is only available for Claude Code.")
+      expect(result).not.toContain("for Claude Code")
+    })
+
+    test("does NOT strip unrelated text containing 'Claude'", () => {
+      // 'Claude' alone (not 'Claude Code') should be preserved
+      const result = transformContentForDevin("Claude is an AI assistant made by Anthropic.")
+      expect(result).toContain("Claude is an AI assistant")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // CLAUDE CODE ENV VARS
+  // -----------------------------------------------------------------------
+
+  describe("Claude Code environment variables", () => {
+    test("strips entire lines containing CLAUDE_CODE_TEAM_NAME", () => {
+      const input = "Set up env:\n- CLAUDE_CODE_TEAM_NAME=myteam\n- PORT=3000"
+      const result = transformContentForDevin(input)
+      expect(result).not.toContain("CLAUDE_CODE_TEAM_NAME")
+      expect(result).toContain("PORT=3000")
+    })
+
+    test("strips entire lines containing CLAUDE_CODE_AGENT_ID", () => {
+      const result = transformContentForDevin("export CLAUDE_CODE_AGENT_ID=abc123")
+      expect(result).not.toContain("CLAUDE_CODE_AGENT_ID")
+    })
+
+    test("strips entire lines containing CLAUDE_CODE_SESSION_*", () => {
+      const result = transformContentForDevin("Read CLAUDE_CODE_SESSION_ID from env")
+      expect(result).not.toContain("CLAUDE_CODE_SESSION_ID")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // CLAUDE CODE TOOL REFS IN PROSE
+  // -----------------------------------------------------------------------
+
+  describe("Claude Code tool refs in prose", () => {
+    test("strips TaskCreate from prose", () => {
+      const result = transformContentForDevin("Use TaskCreate to log progress in Claude Code.")
+      expect(result).not.toContain("TaskCreate")
+    })
+
+    test("strips TaskList from prose", () => {
+      const result = transformContentForDevin("Call TaskList to see pending items.")
+      expect(result).not.toContain("TaskList")
+    })
+
+    test("strips TeammateTool from prose", () => {
+      const result = transformContentForDevin("Use TeammateTool to spawn agents.")
+      expect(result).not.toContain("TeammateTool")
+    })
+
+    test("strips Teammate from prose", () => {
+      const result = transformContentForDevin("Use Teammate({ operation: 'spawnTeam' }) to start.")
+      expect(result).not.toContain("Teammate")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // .claude/ PATH STRIPPING
+  // -----------------------------------------------------------------------
+
+  describe(".claude/ path stripping", () => {
+    test("strips .claude/settings.json", () => {
+      const result = transformContentForDevin("Check .claude/settings.json for hooks.")
+      expect(result).not.toContain(".claude/settings.json")
+    })
+
+    test("strips ~/.claude/plugins/installed_plugins.json", () => {
+      const result = transformContentForDevin("Read ~/.claude/plugins/installed_plugins.json")
+      expect(result).not.toContain("~/.claude/plugins")
+    })
+
+    test("strips ~/.claude/teams/ paths", () => {
+      const result = transformContentForDevin("Team state is stored in ~/.claude/teams/myteam")
+      expect(result).not.toContain("~/.claude/teams/")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // ce-X SLASH COMMAND RESOLUTION VIA REFMAP (4a → 9 chain)
+  // -----------------------------------------------------------------------
+
+  describe("ce: slash command resolution via refMap", () => {
+    test("/ce:plan resolves to [CE] workflow:plan playbook via refMap", () => {
+      const refMap = {
+        "ce-plan": { title: "[CE] workflow:plan", category: "workflow" as const },
+      }
+      const result = transformContentForDevin("Run /ce:plan to create a plan.", refMap)
+      expect(result).toContain("[CE] workflow:plan")
+      expect(result).not.toContain("/ce:plan")
+    })
+
+    test("/ce:review resolves to [CE] workflow:review playbook via refMap", () => {
+      const refMap = {
+        "ce-review": { title: "[CE] workflow:review", category: "workflow" as const },
+      }
+      const result = transformContentForDevin("After work, run /ce:review to verify.", refMap)
+      expect(result).toContain("[CE] workflow:review")
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // RULE INTERACTION / ORDERING HAZARDS
+  // -----------------------------------------------------------------------
+
+  describe("rule interaction and ordering hazards", () => {
+    test("skill rewrite followed by cross-ref does not double-wrap", () => {
+      // step 7 turns 'Load the brainstorming skill' → '[CE] knowledge:brainstorming knowledge entry'
+      // step 9 must not then try to match 'brainstorming' inside that as a playbook
+      const refMap = { "brainstorming": { title: "[CE] workflow:brainstorm", category: "workflow" as const } }
+      const result = transformContentForDevin("Load the brainstorming skill for guidance.", refMap)
+      expect(result).toContain("[CE] knowledge:brainstorming knowledge entry")
+      expect(result).not.toContain("[CE] workflow:brainstorm")
+    })
+
+    test("CLAUDE.md dedup runs before AGENTS.md cross-ref rewrite", () => {
+      // If dedup runs after, AGENTS.md,AGENTS.md would persist
+      const result = transformContentForDevin("Check CLAUDE.md, AGENTS.md, or similar conventions.")
+      expect(result).not.toMatch(/AGENTS\.md.*AGENTS\.md/)
+    })
+
+    test("open rewrite does not corrupt 'Run `open ./plan.md`' inside a larger sentence", () => {
+      const result = transformContentForDevin(
+        "After planning, Run `open ./docs/plans/my-plan.md` to review it."
+      )
+      expect(result).toContain("present ./docs/plans/my-plan.md to the user")
+      expect(result).not.toContain("Run `open ./docs/plans/my-plan.md`")
+    })
+
+    test("compound-engineering ref transform runs before TaskCreate strip, no partial match", () => {
+      const result = transformContentForDevin(
+        "Use compound-engineering:workflow:pr-comment-resolver with TaskCreate to track."
+      )
+      expect(result).toContain("[CE] agent:pr-comment-resolver")
+      expect(result).not.toContain("TaskCreate")
+    })
+
+    test("'the the' artifact cleanup fires after substitution chains", () => {
+      // skill rewrite: 'the brainstorming skill' → 'the [CE] knowledge:brainstorming knowledge entry'
+      // if something upstream prepended 'the', we'd get 'the the [CE]...'
+      const result = transformContentForDevin("Refer to the brainstorming skill.")
+      expect(result).not.toContain("the the")
+    })
+  })
 })
 
 describe("formatPlaybook", () => {
