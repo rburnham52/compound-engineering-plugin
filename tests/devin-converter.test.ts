@@ -923,6 +923,18 @@ Task best-practices-researcher(topic)`
       const result = transformContentForDevin("Run git-worktree skill to manage branches.")
       expect(result).toContain("[CE] knowledge:git-worktree knowledge entry")
     })
+
+    test("does NOT produce 'knowledge:active' from 'the active skill locations'", () => {
+      const result = transformContentForDevin("find SKILL.md files in the active skill locations")
+      expect(result).not.toContain("knowledge:active")
+      expect(result).toContain("active skill")
+    })
+
+    test("does NOT produce 'knowledge:active' even with refMap that lacks active", () => {
+      const refMap = { "git-worktree": { title: "[CE] knowledge:git-worktree", category: "knowledge" as const } }
+      const result = transformContentForDevin("find SKILL.md files in the active skill locations", refMap)
+      expect(result).not.toContain("knowledge:active")
+    })
   })
 
   // -----------------------------------------------------------------------

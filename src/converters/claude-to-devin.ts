@@ -391,10 +391,16 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     /(?:Load|Invoke) the [`"]?([\w][\w-]*)[\`"]? skill\b/gi,
     (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
   )
-  // "the X skill" (not followed by directory/file/path) — skip pronouns/articles
+  // "the X skill" (not followed by directory/file/path) — skip pronouns/articles and unknown names
+  // Guard against false positives like "the active skill locations" by only rewriting known refMap names
   result = result.replace(
-    /the [`"]?([\w][\w-]*)[\`"]? skill\b(?!\s*(?:directory|file|path))/gi,
-    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    /the [`"]?([\w][\w-]*)[\`"]? skill\b(?!\s*(?:directory|file|path|location))/gi,
+    (_match, name: string) => {
+      if (SKIP_SKILL_NAMES.test(name)) return _match
+      const normalized = normalizeName(name)
+      if (playbookRefMap && !playbookRefMap[normalized]) return _match
+      return `the ${CE_PREFIX} knowledge:${normalized} knowledge entry`
+    },
   )
   // SKILL.md path references
   result = result.replace(
