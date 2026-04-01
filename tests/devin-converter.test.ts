@@ -460,14 +460,14 @@ describe("convertClaudeToDevin", () => {
 })
 
 describe("transformContentForDevin", () => {
-  test("preserves .claude/ paths (no .devin/ rewrite)", () => {
+  test("strips .claude/ paths (no Devin equivalent)", () => {
     const result = transformContentForDevin("Read .claude/settings.json for config.")
-    expect(result).toContain(".claude/settings.json")
+    expect(result).not.toContain(".claude/settings.json")
   })
 
-  test("preserves ~/.claude/ paths (no .devin/ rewrite)", () => {
+  test("strips ~/.claude/ paths (no Devin equivalent)", () => {
     const result = transformContentForDevin("Check ~/.claude/config for settings.")
-    expect(result).toContain("~/.claude/config")
+    expect(result).not.toContain("~/.claude/config")
   })
 
   test("transforms Task agent(args) to playbook reference", () => {
@@ -687,10 +687,10 @@ Task best-practices-researcher(topic)`
   // --- Idempotency test ---
 
   test("running transform twice produces same output", () => {
-    const macroMap = { "brainstorm": "workflow_brainstorm" }
+    const refMap = { "brainstorm": { title: "[CE] workflow:brainstorm", category: "workflow" as const } }
     const input = "Load the brainstorming skill and Run the brainstorm playbook"
-    const first = transformContentForDevin(input, macroMap)
-    const second = transformContentForDevin(first, macroMap)
+    const first = transformContentForDevin(input, refMap)
+    const second = transformContentForDevin(first, refMap)
     expect(second).toBe(first)
   })
 })

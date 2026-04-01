@@ -284,7 +284,12 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     return `${prefix}Run the ${playbookName} playbook with: ${args.trim()}`
   })
 
-  // 2. Rewrite CLAUDE.md → AGENTS.md
+  // 2. Rewrite CLAUDE.md → AGENTS.md (avoid producing "AGENTS.md, AGENTS.md" duplicates)
+  // First collapse existing "CLAUDE.md, AGENTS.md" or "AGENTS.md, CLAUDE.md" combos → just "AGENTS.md"
+  result = result.replace(/\bCLAUDE\.md(?:\s*,\s*|\s+and\s+)AGENTS\.md\b/gi, "AGENTS.md")
+  result = result.replace(/\bAGENTS\.md(?:\s*,\s*|\s+and\s+)CLAUDE\.md\b/gi, "AGENTS.md")
+  // Then collapse any remaining "AGENTS.md, AGENTS.md" duplicates (from prior bad transforms or double-pass)
+  result = result.replace(/\bAGENTS\.md(?:\s*,\s*|\s+or\s+|\s+and\s+)AGENTS\.md\b/gi, "AGENTS.md")
   result = result.replace(/\bCLAUDE\.md\b/g, "AGENTS.md")
 
   // 3. Transform @agent-name references
@@ -328,19 +333,21 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     (_match, skillName: string) => `the ${CE_PREFIX} knowledge:${skillName} knowledge entry (assets)`,
   )
   // "Load/Invoke/Run `X` skill" or "Load/Invoke/Run X skill" → knowledge entry reference
+  // Guard: skip pronouns/articles as the captured name (this, the, a, an, that, my, your)
+  const SKIP_SKILL_NAMES = /^(?:this|that|the|a|an|my|your|its|their)$/i
   result = result.replace(
     /(?:Load|Invoke|Run) [`]?([\w][\w-]*)[`]? skill\b/gi,
-    (_match, name: string) => `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
   )
   // "Load/Invoke the X skill" (without backticks)
   result = result.replace(
     /(?:Load|Invoke) the [`"]?([\w][\w-]*)[\`"]? skill\b/gi,
-    (_match, name: string) => `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `Refer to the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
   )
-  // "the X skill" (not followed by directory/file/path)
+  // "the X skill" (not followed by directory/file/path) — skip pronouns/articles
   result = result.replace(
     /the [`"]?([\w][\w-]*)[\`"]? skill\b(?!\s*(?:directory|file|path))/gi,
-    (_match, name: string) => `the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
+    (_match, name: string) => SKIP_SKILL_NAMES.test(name) ? _match : `the ${CE_PREFIX} knowledge:${normalizeName(name)} knowledge entry`,
   )
   // SKILL.md path references
   result = result.replace(
@@ -369,22 +376,21 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     /#?\$ARGUMENTS/g,
     "the user-provided input",
   )
-  // Desktop shell commands: open/xdg-open <file> → present to user
+  // Desktop shell commands: xdg-open <file> → present to user
+  // Only match actual file paths (start with . / ~ or contain a .) — not URLs, adjectives, or CLI subcommands
   result = result.replace(
-    /\bxdg-open ([\w./\-<>]+)/g,
+    /\bxdg-open ([\w./~\-]+)/g,
     "present $1 to the user",
   )
-  // "Run `open <path>` to open the file ..." → "present <path> to the user"
+  // "Run `open <path>`" — only when in backtick command context with a local path
   result = result.replace(
-    /Run `open ([\w./\-<>]+)`[^`\n]*/g,
+    /Run `open ([./~][\w./\-]+)`[^`\n]*/g,
     "present $1 to the user",
   )
+  // Standalone `open <local-path>` on its own (starts with . / ~, not http/https/agent-browser context)
+  // Must be preceded by start-of-line or whitespace, and path must start with . / or ~
   result = result.replace(
-    /\bxdg-open ([\w./\-<>]+)[^`\n]*/g,
-    "present $1 to the user",
-  )
-  result = result.replace(
-    /\bopen ([\w./\-<>]+)(?: on macOS)?/g,
+    /(?<=^|\s)`?open ([./~][\w./\-]+)`?(?:\s+(?:in|to|on|with)[^\n]*)?/gm,
     "present $1 to the user",
   )
   // review <filepath> as shell command → present file to user
@@ -395,6 +401,42 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
   // Claude Code-specific concepts — strip entire lines with no Devin equivalent
   result = result.replace(
     /^.*?(?:Begin implementing in Claude Code on the web|use `&` to run in background|LFG\/SLFG|ultrathink|disable-model-invocation|on remote.*?&|start work in background for Claude Code).*$/gim,
+    "",
+  )
+
+  // Claude Code platform hints — strip inline hints like "(e.g., Ask the user in Claude Code, ...)"
+  result = result.replace(
+    /\([^)]*(?:in Claude Code|Claude Code web|request_user_input in Codex|ask_user in Gemini)[^)]*\)/gi,
+    "",
+  )
+  // Standalone "in Claude Code" / "for Claude Code" fragments
+  result = result.replace(
+    /\b(?:in|for|on|with) Claude Code(?:'s)?(?:\s+(?:web|app|desktop|platform|extension))?/gi,
+    "",
+  )
+
+  // compound-engineering:category:name prose references → [CE] agent:name
+  // Matches: "compound-engineering:workflow:pr-comment-resolver", "compound-engineering:research:best-practices-researcher"
+  result = result.replace(
+    /compound-engineering:[a-z][a-z0-9-]*:([a-z][a-z0-9-]+)/gi,
+    (_match, name: string) => `[CE] agent:${normalizeName(name)}`,
+  )
+
+  // ~/.claude/ and .claude/ directory references — remove (no equivalent in Devin)
+  result = result.replace(
+    /~?\/?(?:\.claude)\/[\w./\-]*/g,
+    "",
+  )
+
+  // Claude Code environment variables — strip entire lines containing them
+  result = result.replace(
+    /^.*?CLAUDE_CODE_(?:TEAM|AGENT|SESSION|TASK)[_A-Z]*.*$/gim,
+    "",
+  )
+
+  // Claude Code tool references in prose: TaskCreate, TaskList, TaskGet, TaskUpdate, Teammate
+  result = result.replace(
+    /\b(?:TaskCreate|TaskList|TaskGet|TaskUpdate|TeammateTool|Teammate)\b/g,
     "",
   )
   // Circular AGENTS.md fallback: "If AGENTS.md is absent, fall back to AGENTS.md" → remove
