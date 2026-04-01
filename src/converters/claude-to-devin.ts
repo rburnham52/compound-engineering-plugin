@@ -48,7 +48,11 @@ export function convertClaudeToDevin(
       if (namespacedAlias !== name) playbookRefMap[namespacedAlias] = ref
     } else {
       const name = normalizeName(skill.name)
-      playbookRefMap[name] = { title: toDevinTitle(name, "knowledge"), category: "knowledge" as const }
+      const knowledgeRef: PlaybookRef = { title: toDevinTitle(name, "knowledge"), category: "knowledge" as const }
+      playbookRefMap[name] = knowledgeRef
+      // Register compound-engineering-<name> alias so /compound-engineering:name refs resolve
+      // e.g. /compound-engineering:todo-resolve → "the compound-engineering-todo-resolve playbook" → lookup hits
+      playbookRefMap[`compound-engineering-${name}`] = knowledgeRef
     }
   }
 
@@ -113,7 +117,7 @@ function convertAgentToPlaybook(
   body = transformContentForDevin(body, playbookRefMap)
 
   const sections: DevinPlaybookSections = {
-    overview: agent.description ?? `Converted from the ${agent.name} agent.`,
+    overview: rewriteClaudeMd(agent.description ?? `Converted from the ${agent.name} agent.`),
     procedure: body || `Instructions converted from the ${agent.name} agent.`,
   }
 
@@ -142,7 +146,7 @@ function convertCommandToPlaybook(
   const body = transformContentForDevin(command.body.trim(), playbookRefMap)
 
   const sections: DevinPlaybookSections = {
-    overview: command.description ?? `Converted from the ${command.name} command.`,
+    overview: rewriteClaudeMd(command.description ?? `Converted from the ${command.name} command.`),
     procedure: body || `Instructions converted from the ${command.name} command.`,
   }
 
@@ -240,6 +244,15 @@ function convertSkillToPlaybook(
   return { name, content, category: "workflow", macro }
 }
 
+function rewriteClaudeMd(text: string): string {
+  let result = text
+  result = result.replace(/\bCLAUDE\.md(?:\s*,\s*|\s+and\s+)AGENTS\.md\b/gi, "AGENTS.md")
+  result = result.replace(/\bAGENTS\.md(?:\s*,\s*|\s+and\s+)CLAUDE\.md\b/gi, "AGENTS.md")
+  result = result.replace(/\bAGENTS\.md(?:\s*,\s*|\s+or\s+|\s+and\s+)AGENTS\.md\b/gi, "AGENTS.md")
+  result = result.replace(/\bCLAUDE\.md\b/g, "AGENTS.md")
+  return result
+}
+
 function generateMcpSetupInstructions(servers: Record<string, ClaudeMcpServer>): string {
   const lines: string[] = [
     "# MCP Server Setup Instructions",
@@ -323,14 +336,19 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
   // 4. Transform slash command references
   // 4a-pre. Backtick-wrapped `/namespace:command args` as a unit → "the X playbook with args: Y"
   // Must run BEFORE bare /namespace:command and BEFORE $ARGUMENTS rewrite so args are preserved intact
-  result = result.replace(/`\/([\w-]+):([\w-]+)([^`\n]*)`/g, (_match, namespace: string, command: string, rest: string) => {
+  // Guard: only transform known CE namespaces to avoid garbling third-party plugin refs (e.g. /ralph-loop:X)
+  const CE_NAMESPACES = new Set(["ce", "workflows", "commands", "compound-engineering"])
+  result = result.replace(/`\/([\.\w-]+):([\.\w-]+)([^`\n]*)`/g, (_match, namespace: string, command: string, rest: string) => {
+    if (!CE_NAMESPACES.has(namespace.toLowerCase())) return _match
     const name = `${normalizeName(namespace)}-${normalizeName(command)}`
     const args = rest.trim()
     if (args) return `the ${name} playbook with args: ${args}`
     return `the ${name} playbook`
   })
   // 4a. /namespace:command (bare, not in backticks) — only after whitespace/start/punctuation
+  // Guard: only transform known CE namespaces
   result = result.replace(/(?<=^|[\s(`'"\)])\/([\w-]+):([\w-]+)/gm, (_match, namespace: string, command: string) => {
+    if (!CE_NAMESPACES.has(namespace.toLowerCase())) return _match
     return `the ${normalizeName(namespace)}-${normalizeName(command)} playbook`
   })
   // 4b. Bare /command-name — same anchor, known names only
@@ -432,6 +450,8 @@ export function transformContentForDevin(body: string, playbookRefMap?: Record<s
     /^.*?(?:Begin implementing in Claude Code on the web|use `&` to run in background|LFG\/SLFG|ultrathink|disable-model-invocation|on remote.*?&|start work in background for Claude Code).*$/gim,
     "",
   )
+  // Strip lines that contain a standalone LFG or SLFG word (e.g. "Swarm-enabled LFG.")
+  result = result.replace(/^[^\n]*\bS?LFG\b[^\n]*$/gm, "")
 
   // Claude Code platform hints — strip inline hints like "(e.g., Ask the user in Claude Code, ...)"
   result = result.replace(
