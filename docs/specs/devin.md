@@ -1,6 +1,6 @@
 # Devin Spec
 
-Last verified: 2026-03-19
+Last verified: 2026-04-01
 
 ## Primary sources
 
@@ -17,6 +17,8 @@ https://docs.devin.ai/product-guides/advanced-mode
 
 - Playbooks are reusable prompt templates for recurring tasks. They can be created in the web app, uploaded as `.devin.md` files, or created via `POST /v1/playbooks` API.
 - The playbook data model is: `title` (string, required), `body` (string, required), `macro` (string or null, optional for slash command binding).
+- **Title convention:** `[CE] <category>:<name>` — e.g. `[CE] workflow:plan`, `[CE] agent:security-reviewer`, `[CE] knowledge:brainstorming`.
+- **Macro convention:** `!ce_<name>` for workflows and commands (e.g. `!ce_plan`). Agent playbooks have `macro: null`.
 - The body uses convention-based markdown sections that Devin recognizes. No rigid schema is enforced.
 
 ### Recognized sections
@@ -50,9 +52,9 @@ https://docs.devin.ai/product-guides/advanced-mode
 ## Knowledge entries
 
 - Knowledge is contextual reference material surfaced automatically during sessions based on triggers.
-- Data model: `name` (string), `body` (string), `trigger` (string), optional `macro` (string or null), `parent_folder_id` (string or null), `pinned_repo` (string or null).
+- API request body: `{ name, body, trigger }` — **`trigger` not `trigger_description`** (v1 used `trigger_description`; v3 uses `trigger`).
 - Response includes `note_id` (string) as the stable identifier for update/delete operations.
-- **Note:** The field was previously called `trigger_description` in v1 — v3 uses `trigger`.
+- Local storage format: `.devin/knowledge/<name>.json` with fields `{ title, body, trigger_description }` (note: local JSON uses `trigger_description`; sync converts this to `trigger` for the API).
 
 ### Trigger design
 
@@ -84,6 +86,8 @@ Devin automatically creates knowledge from: README files, `AGENTS.md`, `.rules`,
 - Enterprise teams can create custom commands through Organization Settings (admin-only)
 - The binding mechanism is the `macro` field on playbook or knowledge API objects
 - Setting `macro` to a command string (e.g., `"review"`) binds it as `/review`
+- The converter emits macros as `!ce_<name>` (e.g. `!ce_plan`, `!ce_work`), which Devin renders as `/ce_plan` etc.
+- Agent playbooks always have `macro: null` — they are invoked by referencing the playbook, not a slash command.
 
 ## MCP servers
 
@@ -133,19 +137,20 @@ Auth: Full role-based access control with service user authentication
 
 Playbook endpoints (org-scoped):
 - `GET /v3beta1/organizations/{orgId}/playbooks` -- List playbooks (paginated, `cursor`/`has_more`)
-- `POST /v3beta1/organizations/{orgId}/playbooks` -- Create playbook
-- `PUT /v3beta1/organizations/{orgId}/playbooks/{playbookId}` -- Update playbook
+- `POST /v3beta1/organizations/{orgId}/playbooks` -- Create playbook (`{ title, body, macro }`)
+- `PUT /v3beta1/organizations/{orgId}/playbooks/{playbookId}` -- Update playbook (`{ title, body, macro }`)
 - `DELETE /v3beta1/organizations/{orgId}/playbooks/{playbookId}` -- Delete playbook
-- Playbook body: `{ title, body, macro }` -- `macro` is `null` for agent playbooks
+- `macro` is `null` for agent playbooks; `!ce_<name>` for workflows and commands
 - Response includes `playbook_id` as stable identifier
-- Category is encoded in the `title` prefix: `[CE] agent:name`, `[CE] workflow:name`, `[CE] command:name`
+- Category is encoded in the `title` prefix: `[CE] agent:name`, `[CE] workflow:name`, `[CE] command:name`, `[CE] knowledge:name`
+- Sync identifies CE-owned entries by the `[CE]` title prefix
 
 Knowledge endpoints (org-scoped):
-- `GET /v3/organizations/{orgId}/knowledge/notes` -- List notes (paginated)
-- `POST /v3/organizations/{orgId}/knowledge/notes` -- Create note
-- `PUT /v3/organizations/{orgId}/knowledge/notes/{noteId}` -- Update note
+- `GET /v3/organizations/{orgId}/knowledge/notes` -- List notes (paginated, same `cursor`/`has_more` shape)
+- `POST /v3/organizations/{orgId}/knowledge/notes` -- Create note (`{ name, body, trigger }`)
+- `PUT /v3/organizations/{orgId}/knowledge/notes/{noteId}` -- Update note (`{ name, body, trigger }`)
 - `DELETE /v3/organizations/{orgId}/knowledge/notes/{noteId}` -- Delete note
-- Note body: `{ name, body, trigger }` -- **`trigger` not `trigger_description`**
+- **`trigger`** (not `trigger_description`) is the field name in v3 API requests/responses
 - Response includes `note_id` as stable identifier
 
 ## Scheduled sessions
@@ -164,6 +169,20 @@ Enterprise/Team feature with five capabilities:
 3. **Improve Playbooks** -- refine playbooks from session feedback
 4. **Start Batch Sessions** -- create multiple sessions at once with optional shared playbook
 5. **Manage Knowledge** -- deduplicate and organize knowledge entries
+
+## Local file layout (converter output)
+
+The `convert --to devin` command writes:
+
+```
+.devin/
+  playbooks/
+    agents/<name>.devin.md       # [CE] agent:name playbooks
+    workflows/<name>.devin.md    # [CE] workflow:name playbooks (from ce:/workflows: skills)
+    commands/<name>.devin.md     # [CE] command:name playbooks (other commands)
+  knowledge/<name>.json          # knowledge entries ({ title, body, trigger_description })
+  mcp-setup-instructions.md      # generated if plugin has MCP servers
+```
 
 ## Config file locations
 
