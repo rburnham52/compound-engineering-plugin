@@ -220,6 +220,26 @@ bun run src/index.ts sync --target devin --yes
 
 MCP servers cannot be synced via the API — Devin configures them through the web UI. After converting, check `.devin/mcp-setup-instructions.md` for setup instructions, then configure each server manually in Devin Settings > MCP Marketplace.
 
+## Verifying converter output
+
+After converting, you can audit the `.devin/` output for correctness using the verification prompt at [`docs/specs/devin_verification_prompt.md`](../specs/devin_verification_prompt.md).
+
+The prompt is designed to be pasted into Devin (or any capable AI) along with a converted playbook or knowledge entry. It performs a line-by-line audit against 10 transformation rules and reports issues in a structured table.
+
+Typical workflow:
+
+```bash
+# 1. Convert
+bun run src/index.ts convert --to devin ./plugins/compound-engineering
+
+# 2. Audit a specific playbook (paste into Devin with the verification prompt)
+cat .devin/playbooks/workflows/plan.devin.md
+
+# 3. Fix any converter issues, then re-convert and re-audit until clean
+# 4. Sync once verified
+bun run src/index.ts sync --target devin --yes
+```
+
 ## Troubleshooting
 
 **"Devin API key required"**
