@@ -1277,3 +1277,136 @@ describe("formatPlaybook", () => {
     expect(result).toContain("## What's Needed From User")
   })
 })
+
+// -----------------------------------------------------------------------
+// V2 REGRESSION TESTS — fixes from v2 verification report
+// -----------------------------------------------------------------------
+
+describe("v2 verification report regression tests", () => {
+  // --- Platform-comparison bullet strips ---
+
+  test("strips '- Claude Code: <detail>' platform-comparison bullet", () => {
+    const input = "MCP tool names vary by platform:\n- Claude Code: `mcp__xcodebuildmcp__list_simulators`\n- Codex: use the equivalent method"
+    const result = transformContentForDevin(input)
+    expect(result).not.toContain("Claude Code:")
+    expect(result).toContain("- Codex: use the equivalent method")
+  })
+
+  test("strips multiple '- Claude Code:' bullets, leaves others", () => {
+    const input = "- Claude Code: `claude --version`\n- Codex: `codex --version`\n- Claude Code: `~/.claude/plugins/installed_plugins.json`"
+    const result = transformContentForDevin(input)
+    expect(result).not.toContain("claude --version")
+    expect(result).not.toContain("installed_plugins.json")
+    expect(result).toContain("- Codex: `codex --version`")
+  })
+
+  // --- Claude Code plugins table row strip ---
+
+  test("strips markdown table row with 'Claude Code plugins' as first column", () => {
+    const input = "| Vercel AI SDK | onClick | tool() |\n| Claude Code plugins | N/A (CLI) | agents/*.md |\n| Rails + MCP | button_to | tool() |"
+    const result = transformContentForDevin(input)
+    expect(result).not.toContain("Claude Code plugins")
+    expect(result).toContain("| Vercel AI SDK |")
+    expect(result).toContain("| Rails + MCP |")
+  })
+
+  // --- Preposition guard in skill rewrites ---
+
+  test("does NOT produce 'knowledge:at' from 'bulk-load at skill start'", () => {
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const result = transformContentForDevin("do not bulk-load at skill start", refMap)
+    expect(result).not.toContain("knowledge:at")
+    expect(result).toContain("at skill start")
+  })
+
+  test("does NOT produce 'knowledge:on' from 'run on skill completion'", () => {
+    const result = transformContentForDevin("execute on skill completion")
+    expect(result).not.toContain("knowledge:on")
+  })
+})
+
+// -----------------------------------------------------------------------
+// V3 REGRESSION TESTS — fixes from v3 verification report
+// -----------------------------------------------------------------------
+
+describe("v3 verification report regression tests", () => {
+  // --- `ce:X` bare invocations ---
+
+  test("converts `ce:review` to !ce_review macro", () => {
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const result = transformContentForDevin("Invoke `ce:review` to run reviewers.", refMap)
+    expect(result).toContain("`!workflow_review`")
+    expect(result).not.toContain("ce:review")
+  })
+
+  test("converts `ce:review mode:autofix` with args to macro with: args", () => {
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const result = transformContentForDevin("Invoke `ce:review mode:autofix` when done.", refMap)
+    expect(result).toContain("`!workflow_review`")
+    expect(result).toContain("mode:autofix")
+    expect(result).not.toContain("ce:review")
+  })
+
+  test("leaves unknown `ce:X` invocations unchanged", () => {
+    const refMap = { "review": { title: "[CE] workflow:review", category: "workflow" as const, macro: "workflow_review" } }
+    const result = transformContentForDevin("Run `ce:nonexistent`.", refMap)
+    expect(result).toContain("`ce:nonexistent`")
+  })
+
+  // --- Skill("compound-engineering:X") invocations ---
+
+  test("converts Skill(\"compound-engineering:document-review\") to knowledge entry ref", () => {
+    const result = transformContentForDevin(`Re-invoke with: Skill("compound-engineering:document-review", "mode:headless docs/plans/my-plan.md")`)
+    expect(result).toContain("[CE] knowledge:document-review knowledge entry")
+    expect(result).not.toContain("Skill(")
+  })
+
+  test("converts Skill() with no args to bare knowledge entry ref", () => {
+    const result = transformContentForDevin(`Load Skill("compound-engineering:brainstorming")`)
+    expect(result).toContain("[CE] knowledge:brainstorming knowledge entry")
+    expect(result).not.toContain("Skill(")
+  })
+
+  // --- skill: X YAML-style invocations ---
+
+  test("converts 'skill: git-worktree' YAML invocation to knowledge entry ref", () => {
+    const result = transformContentForDevin("skill: git-worktree")
+    expect(result).toContain("[CE] knowledge:git-worktree knowledge entry")
+    expect(result).not.toContain("skill: git-worktree")
+  })
+
+  test("converts indented 'skill: X' invocation preserving indent", () => {
+    const result = transformContentForDevin("  skill: imgup")
+    expect(result).toContain("  Refer to the [CE] knowledge:imgup knowledge entry")
+  })
+
+  // --- Task tool prose → propose_sessions ---
+
+  test("converts 'use the Task tool to launch X' to propose_sessions", () => {
+    const result = transformContentForDevin("use the Task tool to launch 8 parallel sub-agents")
+    expect(result).toContain("propose_sessions")
+    expect(result).not.toContain("Task tool")
+  })
+
+  test("converts 'Launch N agents using the Task tool' to propose_sessions", () => {
+    const result = transformContentForDevin("Launch 8 parallel sub-agents using the Task tool with subagent_type: Explore")
+    expect(result).toContain("propose_sessions")
+    expect(result).not.toContain("Task tool")
+  })
+
+  // --- /model line strip ---
+
+  test("strips line containing /model slash command", () => {
+    const result = transformContentForDevin("First set the /model to Haiku\nRead all pending todos")
+    expect(result).not.toContain("/model")
+    expect(result).toContain("Read all pending todos")
+  })
+
+  // --- Claude Code's Bash → agent shell tools ---
+
+  test("rewrites \"Claude Code's Bash\" to 'agent shell tools'", () => {
+    const result = transformContentForDevin("Claude Code's Bash gives agents shell access")
+    expect(result).toContain("agent shell tools")
+    expect(result).not.toContain("Claude Code's Bash")
+  })
+})
