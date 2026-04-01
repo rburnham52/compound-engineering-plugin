@@ -222,9 +222,9 @@ MCP servers cannot be synced via the API — Devin configures them through the w
 
 ## Verifying converter output
 
-After converting, you can audit the `.devin/` output for correctness using the verification prompt at [`docs/specs/devin_verification_prompt.md`](../specs/devin_verification_prompt.md).
+After syncing, you can ask Devin to self-verify the synced content against the verification prompt at [`docs/specs/devin_verification_prompt.md`](../specs/devin_verification_prompt.md).
 
-The prompt is designed to be pasted into Devin (or any capable AI) along with a converted playbook or knowledge entry. It performs a line-by-line audit against 10 transformation rules and reports issues in a structured table.
+The prompt instructs Devin to list its own playbooks and knowledge entries, audit each one against 10 transformation rules, and report any issues in a structured table.
 
 Typical workflow:
 
@@ -232,12 +232,14 @@ Typical workflow:
 # 1. Convert
 bun run src/index.ts convert --to devin ./plugins/compound-engineering
 
-# 2. Audit a specific playbook (paste into Devin with the verification prompt)
-cat .devin/playbooks/workflows/plan.devin.md
+# 2. Sync to Devin
+DEVIN_API_KEY=cog_xxx DEVIN_ORG_ID=org_xxx bun run src/index.ts sync --target devin --yes
 
-# 3. Fix any converter issues, then re-convert and re-audit until clean
-# 4. Sync once verified
-bun run src/index.ts sync --target devin --yes
+# 3. Open a Devin session, attach docs/specs/devin_verification_prompt.md, and send:
+#    "Please verify latest Compound Engineering update with <file>"
+#    Devin will list playbooks + knowledge entries and audit each one.
+
+# 4. Fix any reported converter issues, then re-convert, re-sync, and re-verify
 ```
 
 ## Troubleshooting
