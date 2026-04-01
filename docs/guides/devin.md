@@ -58,16 +58,53 @@ This produces a `.devin/` directory:
 
 The converter automatically rewrites Claude Code-specific references for Devin:
 
+**Agent invocations**
 - `Task compound-engineering:category:agent-name(args)` → `Use propose_sessions to start a child session with the [CE] agent:name playbook, passing: args`
+- `Task agent(args)` cross-references → `Use propose_sessions to start a child session with the [CE] agent:name playbook`
+- `Task tool` prose (e.g. "use the Task tool to launch agents") → `Use propose_sessions to start child sessions`
+
+**Slash commands and skill invocations**
+- `/ce:plan`, `/workflows:plan` → `` Run `!ce_plan` `` (macro invocation)
+- `` `ce:review mode:autofix` `` (bare backtick invocation) → `` Run `!ce_review` with: mode:autofix ``
+- `/deepen-plan` (knowledge-type skill) → `the [CE] knowledge:deepen-plan knowledge entry`
+- `Skill("compound-engineering:document-review", "mode:headless ...")` → `the [CE] knowledge:document-review knowledge entry`
+- `skill: git-worktree` (YAML-style invocation) → `Refer to the [CE] knowledge:git-worktree knowledge entry`
+
+**Claude Code API and tool names**
 - `CLAUDE.md` → `AGENTS.md`
-- Slash commands like `/ce:plan` or `/workflows:plan` → `the [CE] workflow:plan playbook`
-- Slash commands like `/deepen-plan` (knowledge skills) → `the [CE] knowledge:deepen-plan knowledge entry`
-- Claude XML tags (`<thinking>`, `<examples>`, etc.) are stripped
 - `AskUserQuestion` → `Ask the user`
 - `$ARGUMENTS` / `#$ARGUMENTS` → `the user-provided input`
-- `Task agent(args)` cross-references → `Use propose_sessions to start a child session with the [CE] agent:name playbook`
-- Claude Code-only concepts (`ultrathink`, `LFG/SLFG`, `disable-model-invocation`) are removed
-- File paths like `app/services/foo.rb:42` inside code examples are preserved (not treated as slash commands)
+- `EnterPlanMode` / `ExitPlanMode` → removed
+- `TodoWrite` → `Track progress`
+- `Skill tool` → `the knowledge entry`
+- `Claude Code's Bash` → `agent shell tools`
+
+**Platform-specific content stripping**
+- Claude XML tags (`<thinking>`, `<examples>`, etc.) stripped
+- Lines containing `/model` slash command stripped (no equivalent in Devin)
+- Platform-comparison bullet items (`- Claude Code: ...`) stripped; other platform bullets preserved
+- Table rows with `Claude Code plugins` as first column stripped
+- Claude Code-only concepts (`ultrathink`, `LFG/SLFG`, `disable-model-invocation`) stripped
+- `~/.claude/` and `.claude/` directory references stripped
+- `${CLAUDE_PLUGIN_ROOT}` → `.`
+
+**Preserved**
+- File paths like `app/services/foo.rb:42` inside code examples (not treated as slash commands)
+- Platform-neutral content (`[e.g., Claude Code, Codex, Copilot]` in templates)
+
+### Excluding entries from conversion
+
+Add `exclude-from: [devin]` to any skill, agent, or command frontmatter to prevent it from being converted or synced to Devin:
+
+```markdown
+---
+name: my-skill
+description: ...
+exclude-from: [devin]
+---
+```
+
+Use this for content that is intrinsically Claude Code-specific and cannot be meaningfully translated (e.g. `orchestrating-swarms`, `agent-native-architecture`, `claude-permissions-optimizer`). If an excluded entry was previously synced, the next `sync` run will delete it from Devin automatically.
 
 ### Naming convention
 
