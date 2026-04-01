@@ -460,16 +460,14 @@ describe("convertClaudeToDevin", () => {
 })
 
 describe("transformContentForDevin", () => {
-  test("transforms .claude/ paths to .devin/", () => {
+  test("preserves .claude/ paths (no .devin/ rewrite)", () => {
     const result = transformContentForDevin("Read .claude/settings.json for config.")
-    expect(result).toContain(".devin/settings.json")
-    expect(result).not.toContain(".claude/")
+    expect(result).toContain(".claude/settings.json")
   })
 
-  test("transforms ~/.claude/ paths to ~/.devin/", () => {
+  test("preserves ~/.claude/ paths (no .devin/ rewrite)", () => {
     const result = transformContentForDevin("Check ~/.claude/config for settings.")
-    expect(result).toContain("~/.devin/config")
-    expect(result).not.toContain("~/.claude/")
+    expect(result).toContain("~/.claude/config")
   })
 
   test("transforms Task agent(args) to playbook reference", () => {
@@ -597,21 +595,30 @@ Task best-practices-researcher(topic)`
 
   // --- Playbook cross-references ---
 
-  test("rewrites 'Run the X playbook' to '@macro' with ref map", () => {
-    const macroMap = { "security-sentinel": "security_sentinel" }
-    const result = transformContentForDevin("Run the security-sentinel playbook with: code review", macroMap)
-    expect(result).toBe("Run @security_sentinel with: code review")
+  test("rewrites 'Run the X playbook with: args' to propose_sessions with ref map", () => {
+    const refMap = { "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const } }
+    const result = transformContentForDevin("Run the security-sentinel playbook with: code review", refMap)
+    expect(result).toContain("propose_sessions")
+    expect(result).toContain("[CE] agent:security-sentinel")
+    expect(result).toContain("code review")
   })
 
-  test("rewrites 'the X playbook' to '@macro' with ref map", () => {
-    const macroMap = { "deepen-plan": "deepen_plan" }
-    const result = transformContentForDevin("refer to the deepen-plan playbook", macroMap)
-    expect(result).toBe("refer to @deepen_plan")
+  test("rewrites 'the X playbook' to titled ref with ref map", () => {
+    const refMap = { "deepen-plan": { title: "[CE] workflow:deepen-plan", category: "workflow" as const } }
+    const result = transformContentForDevin("refer to the deepen-plan playbook", refMap)
+    expect(result).toContain("[CE] workflow:deepen-plan")
+  })
+
+  test("knowledge refs emit 'knowledge entry' not 'playbook'", () => {
+    const refMap = { "deepen-plan": { title: "[CE] knowledge:deepen-plan", category: "knowledge" as const } }
+    const result = transformContentForDevin("refer to the deepen-plan playbook", refMap)
+    expect(result).toContain("[CE] knowledge:deepen-plan knowledge entry")
+    expect(result).not.toContain("playbook")
   })
 
   test("preserves original text for unknown playbook names", () => {
-    const macroMap = { "security-sentinel": "security_sentinel" }
-    const result = transformContentForDevin("Run the unknown-agent playbook", macroMap)
+    const refMap = { "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const } }
+    const result = transformContentForDevin("Run the unknown-agent playbook", refMap)
     expect(result).toBe("Run the unknown-agent playbook")
   })
 
@@ -621,25 +628,24 @@ Task best-practices-researcher(topic)`
   })
 
   test("cross-ref is case-insensitive", () => {
-    const macroMap = { "security-sentinel": "security_sentinel" }
-    const result = transformContentForDevin("The security-sentinel playbook handles reviews", macroMap)
-    expect(result).toContain("@security_sentinel")
+    const refMap = { "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const } }
+    const result = transformContentForDevin("The security-sentinel playbook handles reviews", refMap)
+    expect(result).toContain("[CE] agent:security-sentinel")
   })
 
   // --- Transform ordering integration test ---
 
-  test("full chain: @agent-ref → 'the X playbook' → @macro", () => {
-    const macroMap = { "security-sentinel": "security_sentinel" }
-    // @agent ref gets transformed to "the X playbook" by step 3, then to @macro by step 9
-    const result = transformContentForDevin("Ask @security-sentinel for a review.", macroMap)
-    expect(result).toContain("@security_sentinel")
-    expect(result).not.toContain("the security-sentinel playbook")
+  test("full chain: @agent-ref → 'the X playbook' → titled ref", () => {
+    const refMap = { "security-sentinel": { title: "[CE] agent:security-sentinel", category: "agent" as const } }
+    // @agent ref gets transformed to "the X playbook" by step 3, then to titled ref by step 9
+    const result = transformContentForDevin("Ask @security-sentinel for a review.", refMap)
+    expect(result).toContain("[CE] agent:security-sentinel")
   })
 
-  test("full chain: /workflows:plan → 'the workflows-plan playbook' → @workflow_plan", () => {
-    const macroMap = { "plan": "workflow_plan", "workflows-plan": "workflow_plan" }
-    const result = transformContentForDevin("Run /workflows:plan to start planning.", macroMap)
-    expect(result).toContain("@workflow_plan")
+  test("full chain: /workflows:plan → 'the workflows-plan playbook' → titled ref", () => {
+    const refMap = { "workflows-plan": { title: "[CE] workflow:plan", category: "workflow" as const } }
+    const result = transformContentForDevin("Run /workflows:plan to start planning.", refMap)
+    expect(result).toContain("[CE] workflow:plan")
     expect(result).not.toContain("the workflows-plan playbook")
   })
 
