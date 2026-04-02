@@ -237,6 +237,7 @@ export function computeSyncPlan(
   remotePlaybooks: DevinApiPlaybook[],
   remoteKnowledge: DevinApiKnowledgeEntry[],
   options: Pick<SyncDevinOptions, "noDelete">,
+  ceFolderId: string | null = null,
 ): SyncPlan {
   const plan: SyncPlan = { creates: [], updates: [], deletes: [], unchanged: [] }
 
@@ -281,7 +282,8 @@ export function computeSyncPlan(
       matchedRemoteKnowledgeTitles.add(local.title)
       const bodyMatch = normalizeForComparison(local.body) === normalizeForComparison(remote.body)
       const macroMatch = (local.macro ?? null) === (remote.macro ?? null)
-      if (bodyMatch && macroMatch) {
+      const folderMatch = ceFolderId === null || remote.folder_id === ceFolderId
+      if (bodyMatch && macroMatch && folderMatch) {
         plan.unchanged.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
       } else {
         plan.updates.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
@@ -455,8 +457,16 @@ export async function syncToDevin(
     `  Found ${remotePlaybooks.length} [CE] playbooks, ${remoteKnowledge.length} [CE] knowledge entries`,
   )
 
+  // Resolve 'Compound Engineering' knowledge folder (optional — groups all CE knowledge in one folder)
+  const ceFolderId = await resolveCEFolderId(client)
+  if (ceFolderId) {
+    console.log(`\n  Using 'Compound Engineering' knowledge folder: ${ceFolderId}`)
+  } else if (local.knowledge.length > 0) {
+    console.log("\n  Tip: Create a 'Compound Engineering' folder in the Devin knowledge UI to group CE entries automatically.")
+  }
+
   // Compute diff
-  const plan = computeSyncPlan(local.playbooks, local.knowledge, remotePlaybooks, remoteKnowledge, options)
+  const plan = computeSyncPlan(local.playbooks, local.knowledge, remotePlaybooks, remoteKnowledge, options, ceFolderId)
 
   // Display plan
   console.log("\nChanges:")
@@ -486,14 +496,6 @@ export async function syncToDevin(
   if (options.dryRun) {
     console.log("\nRun without --dry-run to apply changes.")
     return
-  }
-
-  // Resolve [CE] knowledge folder (optional — groups all CE knowledge in one folder)
-  const ceFolderId = await resolveCEFolderId(client)
-  if (ceFolderId) {
-    console.log(`\n  Using 'Compound Engineering' knowledge folder: ${ceFolderId}`)
-  } else if (local.knowledge.length > 0) {
-    console.log("\n  Tip: Create a 'Compound Engineering' folder in the Devin knowledge UI to group CE entries automatically.")
   }
 
   console.log("\nExecuting...")
