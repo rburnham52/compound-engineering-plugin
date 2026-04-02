@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { computeSyncPlan, syncToDevin } from "../src/sync/devin"
+import { computeSyncPlan, syncToDevin, uninstallFromDevin } from "../src/sync/devin"
 import type {
   DevinApiPlaybook,
   DevinApiKnowledgeEntry,
@@ -74,6 +74,18 @@ describe("syncToDevin", () => {
   test("throws on non-cog_ key before any network call", async () => {
     await expect(
       syncToDevin("/fake/dir", { apiKey: "legacy-key", orgId: "org-1" }, defaultSyncOptions)
+    ).rejects.toThrow("service user key")
+  })
+
+  test("uninstall throws on non-cog_ key before any network call", async () => {
+    await expect(
+      uninstallFromDevin({ apiKey: "legacy-key", orgId: "org-1" }, { dryRun: false, autoConfirm: false })
+    ).rejects.toThrow("service user key")
+  })
+
+  test("uninstall with apk_ key throws before any network call", async () => {
+    await expect(
+      uninstallFromDevin({ apiKey: "apk_xxx", orgId: "org-1" }, { dryRun: false, autoConfirm: false })
     ).rejects.toThrow("service user key")
   })
 

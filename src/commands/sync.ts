@@ -68,6 +68,11 @@ export default defineCommand({
       type: "string",
       description: "Sync specific entries, comma-separated (devin only)",
     },
+    uninstall: {
+      type: "boolean",
+      default: false,
+      description: "Remove all [CE] entries from Devin (devin only)",
+    },
     orgId: {
       type: "string",
       alias: "org-id",
@@ -96,6 +101,11 @@ export default defineCommand({
       const resolvedDir = path.resolve(args.dir)
       if (!resolvedDir.startsWith(process.cwd())) {
         throw new Error("--dir must be within the project directory")
+      }
+      if (args.uninstall) {
+        const { uninstallFromDevin } = await import("../sync/devin")
+        await uninstallFromDevin(client, { dryRun: args.dryRun, autoConfirm: args.yes })
+        return
       }
       const { syncToDevin } = await import("../sync/devin")
       await syncToDevin(resolvedDir, client, {

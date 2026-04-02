@@ -399,6 +399,68 @@ async function executeSyncPlan(
   return result
 }
 
+// --- Uninstall ---
+
+export type UninstallDevinOptions = {
+  dryRun: boolean
+  autoConfirm: boolean
+}
+
+export async function uninstallFromDevin(
+  client: DevinClient,
+  options: UninstallDevinOptions,
+): Promise<void> {
+  if (!client.apiKey.startsWith("cog_")) {
+    throw new Error(
+      "Devin V3 requires a service user key (starts with cog_). " +
+      "Generate one at Organization Settings > Service Users in the Devin web app."
+    )
+  }
+
+  console.log(options.dryRun ? "Uninstalling from Devin API (DRY RUN)..." : "Uninstalling from Devin API...")
+
+  console.log("\nFetching remote [CE] entries...")
+  const remotePlaybooks = (await fetchRemotePlaybooks(client)).filter((p) => p.title.startsWith(CE_PREFIX))
+  const remoteKnowledge = (await fetchRemoteKnowledge(client)).filter((k) => k.name.startsWith(CE_PREFIX))
+  console.log(`  Found ${remotePlaybooks.length} [CE] playbooks, ${remoteKnowledge.length} [CE] knowledge entries`)
+
+  const total = remotePlaybooks.length + remoteKnowledge.length
+  if (total === 0) {
+    console.log("\nNothing to uninstall.")
+    return
+  }
+
+  console.log("\nWould delete:")
+  for (const p of remotePlaybooks) console.log(`  - ${p.title}`)
+  for (const k of remoteKnowledge) console.log(`  - ${k.name}`)
+
+  if (options.dryRun) {
+    console.log("\nRun without --dry-run to apply.")
+    return
+  }
+
+  if (!options.autoConfirm) {
+    console.log(`\n${total} entries would be permanently deleted from Devin.`)
+    console.log("Re-run with --yes to confirm.")
+    return
+  }
+
+  console.log("\nDeleting...")
+  let deleted = 0
+  for (const p of remotePlaybooks) {
+    console.log(`  \x1b[31m- DELETE\x1b[0m  ${p.title}`)
+    await devinRequest(client, playbooksPath(client.orgId, p.playbook_id), { method: "DELETE", json: false })
+    deleted++
+  }
+  for (const k of remoteKnowledge) {
+    console.log(`  \x1b[31m- DELETE\x1b[0m  ${k.name}`)
+    await devinRequest(client, knowledgePath(client.orgId, k.note_id), { method: "DELETE", json: false })
+    deleted++
+  }
+
+  console.log(`\nUninstall complete: ${deleted} entries deleted.`)
+}
+
 // --- Main Orchestrator ---
 
 export async function syncToDevin(

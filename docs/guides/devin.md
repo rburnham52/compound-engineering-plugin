@@ -228,6 +228,7 @@ bun run src/index.ts sync --target devin --dir path/to/.devin
 | `--no-delete` | `false` | Skip orphan deletion entirely |
 | `--yes` | `false` | Auto-confirm deletions |
 | `--only <names>` | _(all)_ | Comma-separated entry names to sync |
+| `--uninstall` | `false` | Remove all `[CE]` entries from Devin |
 
 ## Typical Workflow
 
@@ -243,6 +244,10 @@ bun run src/index.ts sync --target devin --dry-run
 
 # 4. Apply changes
 bun run src/index.ts sync --target devin --yes
+
+# To remove all CE content from Devin
+bun run src/index.ts sync --target devin --uninstall --dry-run  # preview
+bun run src/index.ts sync --target devin --uninstall --yes       # apply
 ```
 
 ## How the sync algorithm works
