@@ -251,12 +251,12 @@ bun run src/index.ts sync --target devin --yes
 2. Constructs `[CE] type:name` titles from directory structure + filenames
 3. Fetches all playbooks and knowledge from the Devin API
 4. Filters remote entries to `[CE]`-prefixed ones (ignores manually-created content)
-5. Looks up a folder named `Compound Engineering` in the knowledge folders API (optional)
-6. Diffs local vs remote by title — for knowledge entries, also checks `folder_id` matches
+5. Looks up a folder named `Compound Engineering` in the knowledge folders API (optional — used when creating new entries)
+6. Diffs local vs remote by title to compute creates, updates, deletes, and unchanged
 7. Content comparison normalizes CRLF line endings and trailing whitespace to avoid false updates
 8. Executes changes sequentially with exponential backoff on rate limits (429s)
 
-> **Folder grouping:** If a `Compound Engineering` folder exists in the Devin knowledge UI, all CE knowledge entries are automatically placed inside it. Create the folder once in the UI; the next sync moves existing entries in.
+> **Folder grouping:** The sync detects a `Compound Engineering` folder if it exists and logs its ID, but the Devin API currently ignores `folder_id` on create/update requests — folder assignment is UI-only. You can manually drag entries into the folder in the Devin knowledge UI. The sync code passes `folder_id` on all knowledge writes so it will work automatically if Devin adds API support.
 
 ## MCP Server Setup
 
