@@ -130,7 +130,7 @@ type DevinKnowledgeFoldersPage = { items: DevinKnowledgeFolder[]; has_next_page:
 async function findCEFolderId(client: DevinClient): Promise<string | null> {
   const page = await devinRequest<DevinKnowledgeFoldersPage>(client, knowledgeFoldersPath(client.orgId))
   if (!page) return null
-  const folder = page.items.find((f) => f.name === "[CE]")
+  const folder = page.items.find((f) => f.name === "Compound Engineering")
   return folder?.id ?? null
 }
 
@@ -491,9 +491,9 @@ export async function syncToDevin(
   // Resolve [CE] knowledge folder (optional — groups all CE knowledge in one folder)
   const ceFolderId = await resolveCEFolderId(client)
   if (ceFolderId) {
-    console.log(`\n  Using [CE] knowledge folder: ${ceFolderId}`)
+    console.log(`\n  Using 'Compound Engineering' knowledge folder: ${ceFolderId}`)
   } else if (local.knowledge.length > 0) {
-    console.log("\n  Tip: Create a '[CE]' folder in the Devin knowledge UI to group CE entries automatically.")
+    console.log("\n  Tip: Create a 'Compound Engineering' folder in the Devin knowledge UI to group CE entries automatically.")
   }
 
   console.log("\nExecuting...")
