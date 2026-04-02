@@ -49,8 +49,8 @@ This produces a `.devin/` directory:
 |-------------|-------|--------|
 | Agents | Playbooks (`.devin.md`) | Overview/Procedure/Specifications sections |
 | Commands | Playbooks (`.devin.md`) | Overview/Procedure sections |
-| Workflows (ce: skills) | Playbooks (`.devin.md`) | Overview/Procedure sections, `!ce_name` macro |
-| Skills | Knowledge entries (`.json`) | Title, body, trigger description |
+| Workflows (ce: skills) | Playbooks (`.devin.md`) | Overview/Procedure sections, `!ce-name` macro |
+| Skills | Knowledge entries (`.json`) | Title, body, trigger, `!ce-name` macro |
 | MCP servers | Setup instructions | `.devin/mcp-setup-instructions.md` |
 | Hooks | Skipped | Warning emitted (Devin has no file-based hooks) |
 
@@ -251,9 +251,12 @@ bun run src/index.ts sync --target devin --yes
 2. Constructs `[CE] type:name` titles from directory structure + filenames
 3. Fetches all playbooks and knowledge from the Devin API
 4. Filters remote entries to `[CE]`-prefixed ones (ignores manually-created content)
-5. Diffs local vs remote by title to compute creates, updates, deletes, and unchanged
-6. Content comparison normalizes CRLF line endings and trailing whitespace to avoid false updates
-7. Executes changes sequentially with exponential backoff on rate limits (429s)
+5. Looks up a folder named `Compound Engineering` in the knowledge folders API (optional)
+6. Diffs local vs remote by title — for knowledge entries, also checks `folder_id` matches
+7. Content comparison normalizes CRLF line endings and trailing whitespace to avoid false updates
+8. Executes changes sequentially with exponential backoff on rate limits (429s)
+
+> **Folder grouping:** If a `Compound Engineering` folder exists in the Devin knowledge UI, all CE knowledge entries are automatically placed inside it. Create the folder once in the UI; the next sync moves existing entries in.
 
 ## MCP Server Setup
 
