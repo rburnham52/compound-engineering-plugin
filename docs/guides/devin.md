@@ -50,7 +50,7 @@ This produces a `.devin/` directory:
 | Agents | Playbooks (`.devin.md`) | Overview/Procedure/Specifications sections |
 | Commands | Playbooks (`.devin.md`) | Overview/Procedure sections |
 | Workflows (ce: skills) | Playbooks (`.devin.md`) | Overview/Procedure sections, `!ce-name` macro |
-| Skills | Knowledge entries (`.json`) | Title, body, trigger, `!ce-name` macro |
+| Skills | Knowledge entries (`.json`) | Title, body, trigger, `!ce-name` macro (see note) |
 | MCP servers | Setup instructions | `.devin/mcp-setup-instructions.md` |
 | Hooks | Skipped | Warning emitted (Devin has no file-based hooks) |
 
@@ -261,7 +261,7 @@ bun run src/index.ts sync --target devin --uninstall --yes       # apply
 7. Content comparison normalizes CRLF line endings and trailing whitespace to avoid false updates
 8. Executes changes sequentially with exponential backoff on rate limits (429s)
 
-> **Folder grouping:** The sync detects a `Compound Engineering` folder if it exists and logs its ID, but the Devin API currently ignores `folder_id` on create/update requests — folder assignment is UI-only. You can manually drag entries into the folder in the Devin knowledge UI. The sync code passes `folder_id` on all knowledge writes so it will work automatically if Devin adds API support.
+> **Knowledge API limitations (as of April 2026):** The Devin v3 API currently ignores `macro` and `folder_id` on knowledge note create/update requests — both fields always return `null` regardless of what is sent. Macros and folder assignment for knowledge entries must be set manually in the Devin UI. The sync code sends these fields on every write so they will take effect automatically once Devin adds API support.
 
 ## MCP Server Setup
 
