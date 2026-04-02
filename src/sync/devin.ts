@@ -124,14 +124,14 @@ function knowledgeFoldersPath(orgId: string): string {
   return `/v3/organizations/${orgId}/knowledge/folders`
 }
 
-type DevinKnowledgeFolder = { id: string; name: string }
-type DevinKnowledgeFoldersPage = { items: DevinKnowledgeFolder[]; has_next_page: boolean; end_cursor: string | null }
+type DevinKnowledgeFolder = { folder_id: string; name: string }
+type DevinKnowledgeFoldersResponse = { folders: DevinKnowledgeFolder[] }
 
 async function findCEFolderId(client: DevinClient): Promise<string | null> {
-  const page = await devinRequest<DevinKnowledgeFoldersPage>(client, knowledgeFoldersPath(client.orgId))
-  if (!page) return null
-  const folder = page.items.find((f) => f.name === "Compound Engineering")
-  return folder?.id ?? null
+  const res = await devinRequest<DevinKnowledgeFoldersResponse>(client, knowledgeFoldersPath(client.orgId))
+  if (!res) return null
+  const folder = res.folders.find((f) => f.name === "Compound Engineering")
+  return folder?.folder_id ?? null
 }
 
 // --- Local State Reader ---
