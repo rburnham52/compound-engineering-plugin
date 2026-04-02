@@ -237,7 +237,6 @@ export function computeSyncPlan(
   remotePlaybooks: DevinApiPlaybook[],
   remoteKnowledge: DevinApiKnowledgeEntry[],
   options: Pick<SyncDevinOptions, "noDelete">,
-  ceFolderId: string | null = null,
 ): SyncPlan {
   const plan: SyncPlan = { creates: [], updates: [], deletes: [], unchanged: [] }
 
@@ -282,8 +281,7 @@ export function computeSyncPlan(
       matchedRemoteKnowledgeTitles.add(local.title)
       const bodyMatch = normalizeForComparison(local.body) === normalizeForComparison(remote.body)
       const macroMatch = (local.macro ?? null) === (remote.macro ?? null)
-      const folderMatch = ceFolderId === null || remote.folder_id === ceFolderId
-      if (bodyMatch && macroMatch && folderMatch) {
+      if (bodyMatch && macroMatch) {
         plan.unchanged.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
       } else {
         plan.updates.push({ title: local.title, remoteId: remote.note_id, category: "knowledge" })
@@ -466,7 +464,7 @@ export async function syncToDevin(
   }
 
   // Compute diff
-  const plan = computeSyncPlan(local.playbooks, local.knowledge, remotePlaybooks, remoteKnowledge, options, ceFolderId)
+  const plan = computeSyncPlan(local.playbooks, local.knowledge, remotePlaybooks, remoteKnowledge, options)
 
   // Display plan
   console.log("\nChanges:")

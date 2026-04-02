@@ -262,33 +262,4 @@ describe("computeSyncPlan", () => {
     expect(plan.updates).toHaveLength(0)
   })
 
-  test("knowledge in wrong folder triggers update when ceFolderId is set", () => {
-    const local = makeLocalKnowledge()
-    const remote = makeRemoteKnowledge({ folder_id: null })
-
-    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions, "folder-abc")
-
-    expect(plan.updates).toHaveLength(1)
-    expect(plan.unchanged).toHaveLength(0)
-  })
-
-  test("knowledge in correct folder stays unchanged", () => {
-    const local = makeLocalKnowledge()
-    const remote = makeRemoteKnowledge({ folder_id: "folder-abc" })
-
-    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions, "folder-abc")
-
-    expect(plan.unchanged).toHaveLength(1)
-    expect(plan.updates).toHaveLength(0)
-  })
-
-  test("folder check skipped when ceFolderId is null", () => {
-    const local = makeLocalKnowledge()
-    const remote = makeRemoteKnowledge({ folder_id: null })
-
-    const plan = computeSyncPlan([], [local], [], [remote], defaultOptions, null)
-
-    expect(plan.unchanged).toHaveLength(1)
-    expect(plan.updates).toHaveLength(0)
-  })
 })
